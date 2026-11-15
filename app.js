@@ -5,7 +5,7 @@ const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const CARD_ORDER = ["inter", "nu_pf", "nu_pj", "bradesco"];
 const LIGHT_TEXT = { inter: true, nu_pf: true };
 const SHORT = { inter: "Inter", nu_pf: "Nu PF", nu_pj: "Nu PJ", bradesco: "Bradesco" };
-const MES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+const MES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 let S = null;            // estado vindo da planilha
 let month = null;        // mês selecionado (YYYY-MM)
@@ -37,16 +37,16 @@ function clearKey() { try { localStorage.removeItem(KEY_STORE); } catch (e) { /*
 
 async function gasRun(fn, arg) {
   const key = getKey();
-  if (!key) { askKey(); throw new Error("Falta a chave do app"); }
+  if (!key) { askKey(); throw new Error("Missing app key"); }
   let j;
   try {
     // text/plain evita o pedido de verificação (CORS) que o Apps Script não responde
     const r = await fetch(API_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({ key, fn, arg: arg ?? null }) });
     j = await r.json();
-  } catch (e) { throw new Error("Sem conexão com a planilha"); }
+  } catch (e) { throw new Error("No connection to the spreadsheet"); }
   if (!j.ok) {
-    if (j.error === "CHAVE_INVALIDA") { clearKey(); askKey("Chave não reconhecida. Confira e cole de novo."); throw new Error("Chave do app inválida"); }
+    if (j.error === "CHAVE_INVALIDA") { clearKey(); askKey("Key not recognized. Check it and paste again."); throw new Error("Invalid app key"); }
     throw new Error(j.error);
   }
   return j.data;
@@ -60,12 +60,12 @@ function askKey(msg) {
     d.id = "dlg-key";
     d.className = "sheet";
     d.innerHTML = `<form method="dialog" class="sheet-in" id="form-key">
-      <div class="sheet-head"><span class="mono"><span class="dia">◇</span> Primeiro acesso</span></div>
-      <h3 class="serif">Chave <em>do app</em></h3>
-      <p class="note" id="key-msg">Cole a chave do app (arquivo CHAVE-DO-APP.txt no Mac). Ela fica guardada só neste aparelho.</p>
-      <div class="field"><label class="lab mono" for="key-in">Chave</label>
+      <div class="sheet-head"><span class="mono"><span class="dia">◇</span> First access</span></div>
+      <h3 class="serif">App <em>key</em></h3>
+      <p class="note" id="key-msg">Paste the app key (file CHAVE-DO-APP.txt on the Mac). It is stored only on this device.</p>
+      <div class="field"><label class="lab mono" for="key-in">Key</label>
         <input id="key-in" class="in" autocomplete="off" autocapitalize="off" spellcheck="false" required></div>
-      <button class="submit" type="submit">Entrar</button>
+      <button class="submit" type="submit">Enter</button>
     </form>`;
     document.body.appendChild(d);
     d.addEventListener("cancel", e => e.preventDefault());   // sem chave não dá para usar o app
@@ -117,7 +117,7 @@ async function api(path, body) {
   if (path === "/api/preview") return gasPreview(body);
   if (path === "/api/config" && !body) return gasRun("getConfig");
   const fn = GAS_ROUTES[path];
-  if (!fn) throw new Error("rota desconhecida: " + path);
+  if (!fn) throw new Error("unknown route: " + path);
   return gasRun(fn, body || null);
 }
 
@@ -126,7 +126,7 @@ async function api(path, body) {
 async function write(path, body) {
   try { return await api(path, body); }
   catch (e) {
-    if (e.code === "excel_open" && confirm(e.message + "\n\nGravar mesmo assim?")) return api(path, { ...body, force: true });
+    if (e.code === "excel_open" && confirm(e.message + "\n\nSave anyway?")) return api(path, { ...body, force: true });
     throw e;
   }
 }
@@ -155,13 +155,13 @@ function render() {
   if (!S) return;
   renderRuler(); renderReserve(); renderFlow(); renderChart(); renderFixed(); renderCards(); renderPageTitle(); renderClosePrompt();
   const t = new Date(S.mtime * 1000);
-  $("#foot-time").textContent = "atualizada " + t.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  $("#foot-time").textContent = "updated " + t.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
   const b = $("#banner");
   b.hidden = !S.excel_open;
-  b.textContent = "A planilha está aberta no Excel. Feche antes de lançar pelo app, ou o Excel pode sobrescrever o que for gravado.";
+  b.textContent = "The spreadsheet is open in Excel. Close it before adding from the app, or Excel may overwrite what gets saved.";
 }
 
-const MES_LONGO = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+const MES_LONGO = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 function renderRuler() {
   const sel = $("#m-select");
   sel.innerHTML = S.months.map(m => `<option value="${m.key}">${MES_LONGO[+m.key.slice(5) - 1]} ${m.key.slice(0, 4)}</option>`).join("");
@@ -186,10 +186,10 @@ function renderReserve() {
   const delta = prev ? `${dg > 0 ? "▲" : "▼"} ${rs(Math.abs(dg), false)} vs ${label(prevKey)}` : "";
 
   $("#reserve").innerHTML = `
-    <div class="k"><span>Despesas · ${MES_LONGO[+month.slice(5) - 1]}</span><span class="delta">${delta}</span></div>
-    <p class="label">Você gasta <em>no mês</em></p>
+    <div class="k"><span>Spending · ${MES_LONGO[+month.slice(5) - 1]}</span><span class="delta">${delta}</span></div>
+    <p class="label">You spend <em>this month</em></p>
     <div class="big"><span class="rs">R$</span>${int}<span class="ct">,${ct}</span></div>
-    <div class="sub"><span>custo fixo ${rs(p.vida, false)}</span><span>cartões ${rs(p.cartoes, false)}</span><span>compromissos ${rs(p.compromissos, false)}</span></div>`;
+    <div class="sub"><span>fixed ${rs(p.vida, false)}</span><span>cards ${rs(p.cartoes, false)}</span><span>commitments ${rs(p.compromissos, false)}</span></div>`;
 
   const closed = p.realizado != null;
   const v = closed ? p.realizado : p.reserva;
@@ -197,8 +197,8 @@ function renderReserve() {
   const save = $("#save");
   save.classList.toggle("neg", v < 0);
   save.innerHTML = `
-    <div class="save-l"><span class="mono">${closed ? "Reserva · real" : v < 0 ? "Faltando" : "Reserva · projeção"}</span><span class="label">${
-      closed ? "você guardou <em>de verdade</em>" : v < 0 ? "no vermelho <em>este mês</em>" : "você guarda <em>no mês</em>"}</span></div>
+    <div class="save-l"><span class="mono">${closed ? "Savings · actual" : v < 0 ? "Short" : "Savings · forecast"}</span><span class="label">${
+      closed ? "you <em>actually</em> saved" : v < 0 ? "in the red <em>this month</em>" : "you save <em>this month</em>"}</span></div>
     <div class="save-v"><span class="rs">${v < 0 ? "−R$" : "R$"}</span>${si}<span class="ct">,${sc}</span></div>`;
 }
 
@@ -207,18 +207,18 @@ function renderFlow() {
   const res = Math.max(0, p.reserva);
   const tot = p.vida + p.cartoes + p.compromissos + res || 1;
   const parts = [
-    ["Custo fixo", p.vida, "seg-vida"],
-    ["Cartões", p.cartoes, "seg-cart"],
-    ["Compromissos", p.compromissos, "seg-comp"],
-    ["Reserva", res, "seg-res"],
+    ["Fixed costs", p.vida, "seg-vida"],
+    ["Cards", p.cartoes, "seg-cart"],
+    ["Commitments", p.compromissos, "seg-comp"],
+    ["Savings", res, "seg-res"],
   ];
   $("#flow").innerHTML = `
-    <div class="sec-head"><span class="dia">◇</span> Para onde vai a receita <span class="dots"></span>${label(month)}</div>
+    <div class="sec-head"><span class="dia">◇</span> Where your income goes <span class="dots"></span>${label(month)}</div>
     <div class="stack">${parts.map(([n, v, c]) => `<div class="${c}" style="flex-basis:${(v / tot) * 100}%" title="${n}"></div>`).join("")}</div>
     <div class="rows">
       ${parts.map(([n, v, c]) => `<div class="r"><span class="sw ${c}"></span><span class="nm">${n}</span><span class="dots"></span>
         <span class="v">${col(v)}</span><span class="pc">${Math.round((v / tot) * 100)}%</span></div>`).join("")}
-      <div class="r total"><span class="nm">Receitas</span><span class="dots"></span><span class="v">${col(p.receitas)}</span><span class="pc"></span></div>
+      <div class="r total"><span class="nm">Income</span><span class="dots"></span><span class="v">${col(p.receitas)}</span><span class="pc"></span></div>
     </div>`;
 }
 
@@ -239,8 +239,8 @@ function renderChart() {
     $("#chart").innerHTML = `<div class="hbars">${ks.map((k, i) => {
       const v = vals[i], closed = real[i] != null, d = closed ? real[i] - proj[i] : 0;
       return `<button class="hrow ${tier(v)} ${k === month ? "on" : ""} ${closed ? "closed" : ""}" data-m="${k}">
-        <span class="m">${label(k).toUpperCase()}${closed ? `<small>real</small>` : ""}</span>
-        <span class="track"><i style="width:${pct(v)}%"></i>${closed ? `<s style="left:${pct(proj[i])}%" title="projeção ${rs(proj[i], false)}"></s>` : ""}</span>
+        <span class="m">${label(k).toUpperCase()}${closed ? `<small>actual</small>` : ""}</span>
+        <span class="track"><i style="width:${pct(v)}%"></i>${closed ? `<s style="left:${pct(proj[i])}%" title="forecast ${rs(proj[i], false)}"></s>` : ""}</span>
         <span class="val">${col(v, false)}${closed ? `<small class="${d >= 0 ? "up" : "down"}">${signed(d)}</small>` : ""}</span></button>`;
     }).join("")}</div>${closeAction()}`;
     $$(".hrow").forEach(b => b.onclick = () => { month = b.dataset.m; render(); });
@@ -265,7 +265,7 @@ function renderChart() {
       <text class="val" x="${tx}" y="${ty}" text-anchor="middle">${rs(v, false)}</text>
       <text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle" ${step < 50 ? `style="font-size:9px"` : ""}>${(step < 60 ? MES[+k.slice(5) - 1] : label(k)).toUpperCase()}</text></g>`;
   }).join("");
-  $("#chart").innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Reserva por mês">
+  $("#chart").innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Savings by month">
     <defs><pattern id="hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
       <line x1="0" y1="0" x2="0" y2="5" stroke="${css("--rust")}" stroke-width="1.4"/></pattern></defs>
     ${grid}${bars}<line class="base" x1="0" x2="${W}" y1="${y(0)}" y2="${y(0)}"/></svg>`;
@@ -282,15 +282,15 @@ function renderFixed() {
   const clean = s => s.split("•")[0].trim();
   const tag = s => (s.split("•")[1] || "").trim();
   $("#fixed").innerHTML = `
-    <div class="sec-head"><span class="dia">◇</span> Despesas de vida <span class="dots"></span>${label(month)}</div>
-    <div class="ttl"><h2>Custo fixo</h2><span class="v"><small class="rs-s">R$</small>${brl(tot)}</span></div>
-    <div class="cap">${items.filter(i => i.v).length} itens · toque num item para mudar o valor</div>
+    <div class="sec-head"><span class="dia">◇</span> Living expenses <span class="dots"></span>${label(month)}</div>
+    <div class="ttl"><h2>Fixed costs</h2><span class="v"><small class="rs-s">R$</small>${brl(tot)}</span></div>
+    <div class="cap">${items.filter(i => i.v).length} items · tap one to change it</div>
     <div class="blocks">${items.filter(i => i.v).sort((a, b) => b.v - a.v).map(i => `<div style="flex:${i.v}" title="${clean(i.label)}"></div>`).join("")}</div>
     ${items.map(i => `<button class="fx-item ${i.v ? "" : "zero"}" data-row="${i.row}">
         <span class="nm">${clean(i.label)}</span>${tag(i.label) ? `<span class="tag">${tag(i.label)}</span>` : ""}
         <span class="dots"></span><span class="v">${col(i.v)}</span></button>`).join("")}
-    <button class="ghost" id="add-fixed">+ Adicionar ao custo fixo</button>
-    ${comp.length ? `<div class="comp"><div class="sec-head"><span class="dia">◇</span> Compromissos fora dos cartões <span class="dots"></span>${rs(comp.reduce((a, i) => a + i.v, 0))}</div>
+    <button class="ghost" id="add-fixed">+ Add a fixed cost</button>
+    ${comp.length ? `<div class="comp"><div class="sec-head"><span class="dia">◇</span> Commitments outside cards <span class="dots"></span>${rs(comp.reduce((a, i) => a + i.v, 0))}</div>
       ${comp.map(i => `<div class="r"><span class="nm">${clean(i.label)}</span><span class="dots"></span><span class="v">${col(i.v)}</span></div>`).join("")}</div>` : ""}`;
   $$(".fx-item").forEach(b => b.onclick = () => openFixedEdit(S.vida.find(i => i.row === +b.dataset.row)));
   $("#add-fixed").onclick = () => openExpense("fixed");
@@ -324,7 +324,7 @@ function monthGrid(k, c) {
     const r = v > 0 ? Math.max(2.5, R * Math.sqrt(v / max)) : 0;
     return `<g><title>${label(m)}: R$ ${brl(v)}</title>${shapeSvg(SHAPE[k], cx, cy, R, false)}${r ? shapeSvg(SHAPE[k], cx, cy, r, true) : ""}</g>`;
   }).join("");
-  return `<svg class="grid" viewBox="0 0 104 78" role="img" aria-label="Fatura nos próximos 12 meses">${cells}</svg>`;
+  return `<svg class="grid" viewBox="0 0 104 78" role="img" aria-label="Bill over the next 12 months">${cells}</svg>`;
 }
 
 function renderCards() {
@@ -332,18 +332,18 @@ function renderCards() {
   const i0 = S.months.findIndex(m => m.key === month);
   const next = S.months.slice(i0 + 1, i0 + 4).map(m => m.key);
   $("#cards").innerHTML = `
-    <div class="sec-head"><span class="dia">◇</span> Faturas <span class="dots"></span>${label(month)}</div>
-    ${CARD_ORDER.map(k => `<button type="button" class="band" data-k="${k}" aria-label="Ver despesas do ${SHORT[k]}" style="--share:${total ? ((S.cards[k].totals[month] || 0) / total * 100).toFixed(1) : 0}%">
+    <div class="sec-head"><span class="dia">◇</span> Bills <span class="dots"></span>${label(month)}</div>
+    ${CARD_ORDER.map(k => `<button type="button" class="band" data-k="${k}" aria-label="See ${SHORT[k]} expenses" style="--share:${total ? ((S.cards[k].totals[month] || 0) / total * 100).toFixed(1) : 0}%">
         <h3>${SHORT[k]}</h3><div class="v"><small>R$</small>${brl(S.cards[k].totals[month] || 0)}<span class="chev" aria-hidden="true">›</span></div>
       </button>`).join("")}
-    <p class="cards-hint mono">toque num cartão para ver e excluir despesas</p>`;
+    <p class="cards-hint mono">tap a card to see and delete expenses</p>`;
   $$("#cards .band").forEach(b => b.onclick = () => openCard(b.dataset.k));
   // projeção: bloco separado, discreto
   const pj = $("#proj");
   pj.hidden = !next.length;
   if (!next.length) return;
   pj.innerHTML = `
-    <div class="sec-head"><span class="dia">◇</span> Próximos meses <span class="dots"></span></div>
+    <div class="sec-head"><span class="dia">◇</span> Next months <span class="dots"></span></div>
     <table class="proj-t">
       <thead><tr><th></th>${next.map(m => `<th>${label(m)}</th>`).join("")}</tr></thead>
       <tbody>${CARD_ORDER.map(k => `<tr><td>${SHORT[k]}</td>${next.map(m => `<td>${col(S.cards[k].totals[m] || 0, false)}</td>`).join("")}</tr>`).join("")}</tbody>
@@ -355,10 +355,10 @@ function renderCards() {
 let CD = null;   // { card, month }
 async function openCard(k) {
   CD = { card: k, month };
-  $("#cd-head").textContent = `${SHORT[k]} · fatura ${label(month)}`;
-  $("#cd-title").innerHTML = `${SHORT[k]} <em>${MES_LONGO[+month.slice(5) - 1].toLowerCase()}</em>`;
+  $("#cd-head").textContent = `${SHORT[k]} · ${label(month)} bill`;
+  $("#cd-title").innerHTML = `${SHORT[k]} <em>${MES_LONGO[+month.slice(5) - 1]}</em>`;
   $("#cd-total").innerHTML = "";
-  $("#cd-list").innerHTML = `<p class="note">Carregando…</p>`;
+  $("#cd-list").innerHTML = `<p class="note">Loading…</p>`;
   if (!$("#dlg-card").open) $("#dlg-card").showModal();
   try {
     const r = await api(`/api/expenses?card=${k}&month=${month}`);
@@ -367,20 +367,20 @@ async function openCard(k) {
 }
 
 function renderCardList(r) {
-  $("#cd-total").innerHTML = `<span class="mono">${r.items.length} ${r.items.length === 1 ? "despesa" : "despesas"}</span>${col(r.total)}`;
-  if (!r.items.length) { $("#cd-list").innerHTML = `<p class="note">Nenhuma despesa nessa fatura.</p>`; return; }
+  $("#cd-total").innerHTML = `<span class="mono">${r.items.length} ${r.items.length === 1 ? "expense" : "expenses"}</span>${col(r.total)}`;
+  if (!r.items.length) { $("#cd-list").innerHTML = `<p class="note">No expenses on this bill.</p>`; return; }
   const kind = it => {
     const t = (it.type || "").toLowerCase();
-    if (t.startsWith("recorrente")) return "todo mês";
-    if (t.startsWith("parcelada") && it.last !== CD.month) return `parcelada · até ${label(it.last)}`;
-    if (t.startsWith("parcelada")) return "última parcela";
-    return "à vista";
+    if (t.startsWith("recorrente")) return "monthly";
+    if (t.startsWith("parcelada") && it.last !== CD.month) return `installments · until ${label(it.last)}`;
+    if (t.startsWith("parcelada")) return "last installment";
+    return "one-time";
   };
   $("#cd-list").innerHTML = r.items.map((it, i) => `
     <div class="cd-row" data-i="${i}">
       <div class="cd-main"><span class="cd-name">${it.label.replace(/</g, "&lt;")}</span><span class="cd-kind mono">${kind(it)}</span></div>
       <span class="cd-v">${col(it.value)}</span>
-      <button type="button" class="cd-del" aria-label="Excluir ${it.label.replace(/"/g, "")}">
+      <button type="button" class="cd-del" aria-label="Delete ${it.label.replace(/"/g, "")}">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 7h16M10 7V4h4v3M6 7l1 13h10l1-13M10 11v6M14 11v6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
     </div>`).join("");
@@ -394,8 +394,8 @@ function renderCardList(r) {
 function confirmDelete(row, it) {
   const many = (it.type || "").toLowerCase().startsWith("parcelada") || (it.type || "").toLowerCase().startsWith("recorrente");
   row.classList.add("confirm");
-  row.innerHTML = `<p class="cd-q">Excluir <b>${it.label.replace(/</g, "&lt;")}</b> da planilha?${many ? " Sai a compra inteira, com todos os meses." : ""}</p>
-    <div class="cd-actions"><button type="button" class="cd-no">Cancelar</button><button type="button" class="cd-yes">Excluir</button></div>`;
+  row.innerHTML = `<p class="cd-q">Delete <b>${it.label.replace(/</g, "&lt;")}</b> from the spreadsheet?${many ? " The whole purchase goes, with all its months." : ""}</p>
+    <div class="cd-actions"><button type="button" class="cd-no">Cancel</button><button type="button" class="cd-yes">Delete</button></div>`;
   $(".cd-no", row).onclick = () => openCard(CD.card);
   $(".cd-yes", row).onclick = async () => {
     const name = it.label.split(" — ")[0];
@@ -404,15 +404,15 @@ function confirmDelete(row, it) {
     setTimeout(() => row.remove(), 220);
     const tot = $("#cd-total .money .amt");
     if (tot) tot.textContent = brl(Math.max(0, parseAmount(tot.textContent) - it.value));
-    toast(`Excluindo ${name}…`);
+    toast(`Deleting ${name}…`);
     const { card, month: m } = CD;
     try {
       const r = await write("/api/delete", { token: it.token, card, month: m });
       await refresh(r);
       if (r && r.list && $("#dlg-card").open && CD.card === card) renderCardList(r.list);
       else if ($("#dlg-card").open) await openCard(card);
-      toast(`Excluída da planilha: ${name}`);
-    } catch (e) { alert("Não consegui excluir: " + e.message); if ($("#dlg-card").open) openCard(card); }
+      toast(`Deleted: ${name}`);
+    } catch (e) { alert("Couldn't delete: " + e.message); if ($("#dlg-card").open) openCard(card); }
   };
 }
 
@@ -425,10 +425,10 @@ function openExpense(mode) {
   Object.assign(F, { where: mode === "fixed" ? "fixed" : null, autoWhere: null, userPicked: mode === "fixed", n: 1 });
   $("#f-date").value = S.today;
   $("#f-recog").hidden = true;
-  const opts = S.months.map(m => `<option value="${m.key}">${m.label}</option>`).join("");
+  const opts = S.months.map(m => `<option value="${m.key}">${label(m.key)}</option>`).join("");
   $("#f-start").innerHTML = opts;
   $("#f-start").value = month;
-  $("#f-end").innerHTML = `<option value="">sem fim</option>` + opts;
+  $("#f-end").innerHTML = `<option value="">no end</option>` + opts;
   renderWhere(); renderSteps(); updateMode(); preview();
   $("#dlg-expense").showModal();
   setTimeout(() => $("#f-amount").focus(), 50);
@@ -438,8 +438,8 @@ function renderWhere() {
   const btn = (k, name, sub, bg, light) => `<button type="button" data-k="${k}" class="${F.where === k ? "on" : ""}"
      style="--sel:${bg};--sel-t:var(--bg)">
      ${F.autoWhere === k && !F.userPicked ? `<span class="auto">◆ auto</span>` : ""}<span>${name}</span><span class="d">${sub}</span></button>`;
-  $("#f-where").innerHTML = CARD_ORDER.map(k => btn(k, SHORT[k], `fecha ${S.cards[k].close}`, `var(--brand-${k})`, LIGHT_TEXT[k])).join("")
-    + btn("fixed", "Custo fixo", "todo mês", "var(--cobalt)", true);
+  $("#f-where").innerHTML = CARD_ORDER.map(k => btn(k, SHORT[k], `closes ${S.cards[k].close}`, `var(--brand-${k})`, LIGHT_TEXT[k])).join("")
+    + btn("fixed", "Fixed cost", "monthly", "var(--cobalt)", true);
   $$("#f-where button").forEach(b => b.onclick = () => { F.where = b.dataset.k; F.userPicked = true; renderWhere(); updateMode(); preview(); });
 }
 
@@ -447,8 +447,8 @@ function updateMode() {
   const fixed = F.where === "fixed";
   $("#card-fields").hidden = fixed;
   $("#fixed-fields").hidden = !fixed;
-  $("#f-amount-hint").textContent = fixed ? "valor por mês" : ($("#f-recurring").checked ? "valor por mês" : "valor total da compra");
-  $("#f-submit").textContent = fixed ? "Adicionar ao custo fixo" : "Lançar na planilha";
+  $("#f-amount-hint").textContent = fixed ? "amount per month" : ($("#f-recurring").checked ? "amount per month" : "total amount");
+  $("#f-submit").textContent = fixed ? "Add fixed cost" : "Add to spreadsheet";
 }
 
 function renderSteps() {
@@ -476,10 +476,10 @@ function preview() {
 async function doPreview() {
   const el = $("#f-preview");
   const amount = parseAmount($("#f-amount").value);
-  if (!F.where) { el.innerHTML = `<div class="when mute">Escolha o cartão ou custo fixo.</div>`; return; }
+  if (!F.where) { el.innerHTML = `<div class="when mute">Pick a card or fixed cost.</div>`; return; }
   if (F.where === "fixed") {
     const s = $("#f-start").value, e = $("#f-end").value;
-    el.innerHTML = `<div class="when"><b>${rs(amount)}</b> por mês em Despesas de vida, de <b>${label(s)}</b> ${e ? `até <b>${label(e)}</b>` : "em diante"}.</div>`;
+    el.innerHTML = `<div class="when"><b>${rs(amount)}</b> a month in Living expenses, from <b>${label(s)}</b> ${e ? `to <b>${label(e)}</b>` : "onward"}.</div>`;
     return;
   }
   const seq = ++pvSeq;
@@ -493,10 +493,10 @@ async function doPreview() {
     const from = S.months.findIndex(m => m.key === p.first_month);
     const show = S.months.slice(Math.max(0, from - 1), Math.max(0, from - 1) + Math.max(6, Math.min(p.items.length + 2, 13)));
     const card = S.cards[F.where];
-    el.innerHTML = `<div class="when">Cai na fatura de <b>${label(p.first_month)}</b> do ${card.name}
-        <span class="mono">fecha ${ddmm(p.close_date)} · vence ${ddmm(p.due_date)}${p.items.length > 1 ? ` · ${p.items.length}× de ${rs(p.items[p.items.length - 1].value)}` : ""}</span></div>
-      <div class="tl">${show.map(m => `<div class="${map[m.key] ? "has" : ""}">${m.label}<b>${map[m.key] ? rs(map[m.key], false) : "—"}</b></div>`).join("")}</div>
-      ${beyond ? `<div class="warn">${beyond} parcela(s) depois de ${label(last)}: entram na aba do cartão, mas ficam fora do Controle mensal.</div>` : ""}`;
+    el.innerHTML = `<div class="when">Goes on <b>${card.name}</b>'s <b>${label(p.first_month)}</b> bill
+        <span class="mono">closes ${ddmm(p.close_date)} · due ${ddmm(p.due_date)}${p.items.length > 1 ? ` · ${p.items.length}× of ${rs(p.items[p.items.length - 1].value)}` : ""}</span></div>
+      <div class="tl">${show.map(m => `<div class="${map[m.key] ? "has" : ""}">${label(m.key)}<b>${map[m.key] ? rs(map[m.key], false) : "—"}</b></div>`).join("")}</div>
+      ${beyond ? `<div class="warn">${beyond} installment(s) after ${label(last)}: they go on the card's tab but stay out of the monthly overview.</div>` : ""}`;
   } catch (e) { el.innerHTML = `<div class="warn">${e.message}</div>`; }
 }
 
@@ -520,7 +520,7 @@ $("#f-desc").addEventListener("input", () => {
     F.autoWhere = top.card;
     if (!F.userPicked) { F.where = top.card; renderWhere(); updateMode(); preview(); }
     box.hidden = false;
-    box.innerHTML = `<span class="tip">Reconhecido: ${top.label} costuma ir no <b>${S.cards[top.card].name}</b> (${top.count}×)</span>`
+    box.innerHTML = `<span class="tip">Recognized: ${top.label} usually goes on <b>${S.cards[top.card].name}</b> (${top.count}×)</span>`
       + hits.slice(0, 4).map(h => `<button type="button" data-k="${h.card}" data-l="${h.label}"><i style="background:var(--t-${h.card})"></i>${h.label} · ${S.cards[h.card].name}</button>`).join("");
     $$("button", box).forEach(b => b.onclick = () => {
       $("#f-desc").value = b.dataset.l; F.where = b.dataset.k; F.userPicked = true; renderWhere(); updateMode(); preview();
@@ -531,19 +531,19 @@ $("#f-desc").addEventListener("input", () => {
 $("#form-expense").addEventListener("submit", async ev => {
   ev.preventDefault();
   const btn = $("#f-submit");
-  btn.disabled = true; btn.textContent = "Gravando…";
+  btn.disabled = true; btn.textContent = "Saving…";
   const amount = parseAmount($("#f-amount").value);
   const desc = $("#f-desc").value.trim();
   try {
     let r, msg;
     if (F.where === "fixed") {
       r = await write("/api/fixed", { label: desc, amount, start: $("#f-start").value, end: $("#f-end").value || null });
-      msg = `${desc} entrou no custo fixo · ${rs(amount)}/mês`;
+      msg = `${desc} added to fixed costs · ${rs(amount)}/mo`;
     } else {
       const rec = $("#f-recurring").checked;
       r = await write("/api/expense", { description: desc, amount, date: $("#f-date").value || S.today, card: F.where, installments: F.n, recurring: rec });
       const it = r.schedule.items;
-      msg = `${S.cards[F.where].name} · ${rec ? "todo mês" : it.length > 1 ? `${it.length}× ${rs(it[it.length - 1].value)}` : rs(amount)} · fatura ${label(r.schedule.first_month)}`;
+      msg = `${S.cards[F.where].name} · ${rec ? "monthly" : it.length > 1 ? `${it.length}× ${rs(it[it.length - 1].value)}` : rs(amount)} · ${label(r.schedule.first_month)} bill`;
     }
     $("#dlg-expense").close();
     await refresh(r);
@@ -558,7 +558,7 @@ function openFixedEdit(item) {
   FX = item;
   $("#fx-title").textContent = item.label.split("•")[0].trim();
   $("#fx-amount").value = brl(item.values[month] || 0);
-  $("#fx-start").innerHTML = S.months.map(m => `<option value="${m.key}">${m.label}</option>`).join("");
+  $("#fx-start").innerHTML = S.months.map(m => `<option value="${m.key}">${label(m.key)}</option>`).join("");
   $("#fx-start").value = month;
   $("#dlg-fixed").showModal();
 }
@@ -568,7 +568,7 @@ $("#form-fixed").addEventListener("submit", async ev => {
     const r = await write("/api/fixed/update", { row: FX.row, label: FX.label, amount: parseAmount($("#fx-amount").value), start: $("#fx-start").value });
     $("#dlg-fixed").close();
     await refresh(r);
-    toast(`${$("#fx-title").textContent} atualizado a partir de ${label($("#fx-start").value)}`);
+    toast(`${$("#fx-title").textContent} updated from ${label($("#fx-start").value)}`);
   } catch (e) { alert(e.message); }
 });
 
@@ -576,15 +576,15 @@ $("#form-fixed").addEventListener("submit", async ev => {
 $("#btn-settings").onclick = () => {
   $("#set-rows").innerHTML = CARD_ORDER.map(k => `<div class="set-row" data-k="${k}">
     <span class="nm"><i style="background:var(--t-${k})"></i>${S.cards[k].name}</span>
-    <label class="field"><span class="lab mono">Fecha dia</span><input class="in" type="number" min="1" max="31" name="close" value="${S.cards[k].close}"></label>
-    <label class="field"><span class="lab mono">Vence dia</span><input class="in" type="number" min="1" max="31" name="due" value="${S.cards[k].due}"></label></div>`).join("");
+    <label class="field"><span class="lab mono">Closes on</span><input class="in" type="number" min="1" max="31" name="close" value="${S.cards[k].close}"></label>
+    <label class="field"><span class="lab mono">Due on</span><input class="in" type="number" min="1" max="31" name="due" value="${S.cards[k].due}"></label></div>`).join("");
   $("#dlg-settings").showModal();
 };
 $("#form-settings").addEventListener("submit", async ev => {
   ev.preventDefault();
   const cards = {};
   $$(".set-row").forEach(r => cards[r.dataset.k] = { close: +$("[name=close]", r).value, due: +$("[name=due]", r).value });
-  try { await api("/api/config", { cards }); $("#dlg-settings").close(); await load(true); toast("Fechamentos salvos"); }
+  try { await api("/api/config", { cards }); $("#dlg-settings").close(); await load(true); toast("Card dates saved"); }
   catch (e) { alert(e.message); }
 });
 
@@ -599,9 +599,9 @@ const closable = k => k <= curMonth();      // dá para fechar o mês corrente a
 
 // botão no fim da lista da Reserva, para o mês selecionado
 function closeAction() {
-  if (!closable(month)) return `<p class="close-hint mono">${label(month)} ainda não começou · dá para fechar a partir do mês corrente</p>`;
+  if (!closable(month)) return `<p class="close-hint mono">${label(month)} hasn't started · you can close it from the current month on</p>`;
   const closed = S.per_month[month].realizado != null;
-  return `<button class="ghost close-btn" type="button">${closed ? `Editar valor real de ${label(month)}` : `Fechar ${label(month)}: informar quanto guardei`}</button>`;
+  return `<button class="ghost close-btn" type="button">${closed ? `Edit actual for ${label(month)}` : `Close ${label(month)}: enter what I saved`}</button>`;
 }
 function bindCloseAction() { const b = $("#chart .close-btn"); if (b) b.onclick = () => openClose(month); }
 
@@ -611,8 +611,8 @@ function renderClosePrompt() {
   const k = S.months.map(m => m.key).find(k => ended(k) && S.per_month[k].realizado == null);
   el.hidden = !k;
   if (!k) return;
-  el.innerHTML = `<div><span class="mono">◇ Fechar o mês</span><p><b>${MES_LONGO[+k.slice(5) - 1]} terminou.</b> Quanto você guardou de verdade?</p></div>
-    <button type="button" class="cp-btn">Informar</button>`;
+  el.innerHTML = `<div><span class="mono">◇ Close the month</span><p><b>${MES_LONGO[+k.slice(5) - 1]} is over.</b> How much did you actually save?</p></div>
+    <button type="button" class="cp-btn">Enter</button>`;
   $(".cp-btn", el).onclick = () => openClose(k);
 }
 
@@ -621,7 +621,7 @@ function openClose(k) {
   CL = k;
   const p = S.per_month[k];
   $("#cl-title").textContent = `${MES_LONGO[+k.slice(5) - 1]} ${k.slice(0, 4)}`;
-  $("#cl-proj").innerHTML = `A projeção era <b>R$ ${brl(p.reserva)}</b>.`;
+  $("#cl-proj").innerHTML = `The forecast was <b>R$ ${brl(p.reserva)}</b>.`;
   $("#cl-amount").value = p.realizado != null ? brl(p.realizado) : "";
   $("#cl-reopen").hidden = p.realizado == null;
   $("#dlg-close").showModal();
@@ -638,11 +638,11 @@ $("#form-close").addEventListener("submit", async ev => {
     $("#dlg-close").close();
     await refresh(r);
     const d = amount - S.per_month[CL].reserva;
-    toast(`${label(CL)} fechado · R$ ${brl(amount)} (${signed(d)} vs projeção)`);
+    toast(`${label(CL)} closed · R$ ${brl(amount)} (${signed(d)} vs forecast)`);
   } catch (e) { alert(e.message); }
 });
 $("#cl-reopen").onclick = async () => {
-  try { const r = await write("/api/close", { month: CL, amount: null }); $("#dlg-close").close(); await refresh(r); toast(`${label(CL)} reaberto`); }
+  try { const r = await write("/api/close", { month: CL, amount: null }); $("#dlg-close").close(); await refresh(r); toast(`${label(CL)} reopened`); }
   catch (e) { alert(e.message); }
 };
 
@@ -657,19 +657,19 @@ function renderPageTitle() {
     const closedKs = ks.filter(k => S.per_month[k].realizado != null);
     const realSum = closedKs.reduce((a, k) => a + S.per_month[k].realizado, 0);
     const forecast = ks.reduce((a, k) => a + (S.per_month[k].realizado ?? S.per_month[k].reserva), 0);
-    $("h1", el).innerHTML = `Reserva <em>mês a mês</em>`;
+    $("h1", el).innerHTML = `Savings <em>month by month</em>`;
     if (closedKs.length) {
       $(".pt-v", el).innerHTML = money(realSum);
-      $(".pt-cap", el).textContent = `guardado de verdade (${closedKs.length} ${closedKs.length > 1 ? "meses fechados" : "mês fechado"}) · projeção até ${label(ks[ks.length - 1])}: R$ ${brl(forecast, false)}`;
+      $(".pt-cap", el).textContent = `actually saved (${closedKs.length} ${closedKs.length > 1 ? "months closed" : "month closed"}) · forecast to ${label(ks[ks.length - 1])}: R$ ${brl(forecast, false)}`;
     } else {
       $(".pt-v", el).innerHTML = money(forecast);
-      $(".pt-cap", el).textContent = `projeção de ${label(ks[0])} a ${label(ks[ks.length - 1])} · nenhum mês fechado ainda`;
+      $(".pt-cap", el).textContent = `forecast ${label(ks[0])} to ${label(ks[ks.length - 1])} · no month closed yet`;
     }
   } else {
     const total = CARD_ORDER.reduce((a, k) => a + (S.cards[k].totals[month] || 0), 0);
-    $("h1", el).innerHTML = `Cartões <em>de crédito</em>`;
+    $("h1", el).innerHTML = `Credit <em>cards</em>`;
     $(".pt-v", el).innerHTML = money(total);
-    $(".pt-cap", el).textContent = `faturas de ${MES_LONGO[+month.slice(5) - 1].toLowerCase()}`;
+    $(".pt-cap", el).textContent = `${MES_LONGO[+month.slice(5) - 1]} bills`;
   }
 }
 
@@ -700,7 +700,7 @@ function toast(msg, undoToken) {
   const busy = msg.endsWith("…");          // em andamento: mostra um girador no lugar do ✓
   const ms = undoToken ? 9000 : 3500;
   t.innerHTML = `<span class="t-ico ${busy ? "busy" : ""}">${busy ? "" : `<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.5l2.5 2.5L10 3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square"/></svg>`}</span>
-    <span class="t-msg">${msg}</span>${undoToken ? `<button type="button">Desfazer</button>` : ""}
+    <span class="t-msg">${msg}</span>${undoToken ? `<button type="button">Undo</button>` : ""}
     ${busy ? "" : `<i class="t-bar" style="animation-duration:${ms}ms"></i>`}`;
   t.hidden = false;
   t.style.animation = "none"; void t.offsetWidth; t.style.animation = "";   // reinicia a entrada a cada aviso
@@ -708,7 +708,7 @@ function toast(msg, undoToken) {
   if (!busy) toastTimer = setTimeout(() => t.hidden = true, ms);
   if (undoToken) $("button", t).onclick = async () => {
     t.hidden = true;
-    try { const r = await write("/api/undo", { token: undoToken }); await refresh(r); toast("Desfeito. A linha saiu da planilha."); }
+    try { const r = await write("/api/undo", { token: undoToken }); await refresh(r); toast("Undone. The row was removed from the spreadsheet."); }
     catch (e) { alert(e.message); }
   };
 }
@@ -732,19 +732,19 @@ async function load(force) {
   try {
     const st = await api("/api/state");
     sync.className = "sync";
-    $("span", sync).textContent = st.excel_open ? "aberta no Excel" : "planilha sincronizada";
+    $("span", sync).textContent = st.excel_open ? "open in Excel" : "spreadsheet synced";
     if (st.excel_open) sync.className = "sync stale";
     if (!force && st.mtime === lastMtime && S) { S.excel_open = st.excel_open; return; }
     applyState(st);
   } catch (e) {
     sync.className = "sync err";
-    $("span", sync).textContent = "sem conexão";
+    $("span", sync).textContent = "offline";
     // sem chave, a própria tela de chave já explica o que fazer
-    if (e && /chave do app/i.test(e.message)) return;
+    if (e && /app key|chave do app/i.test(e.message)) return;
     // mostra o motivo na tela, em vez de deixar o app parado sem dados
     const b = $("#banner");
     b.hidden = false;
-    b.textContent = "Não consegui ler a planilha: " + (e && e.message ? e.message : e);
+    b.textContent = "Couldn't read the spreadsheet: " + (e && e.message ? e.message : e);
   }
 }
 

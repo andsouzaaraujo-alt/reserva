@@ -760,4 +760,21 @@ let rzTimer;
 window.addEventListener("resize", () => { clearTimeout(rzTimer); rzTimer = setTimeout(() => S && renderChart(), 120); });
 // relê a planilha de tempos em tempos: se você editar no Excel, o app acompanha
 setInterval(() => { if (!document.hidden && !$("dialog[open]")) load(false); }, 60000);
-document.addEventListener("visibilitychange", () => { if (!document.hidden) load(false); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { load(false); checkUpdate(); } });
+
+// ---------------------------------------------------------------- versão nova do site
+// O ícone na tela do iPhone guarda a página antiga por um tempo. Aqui o app pergunta ao site
+// qual é a versão publicada e, se for outra, recarrega sozinho (nunca com um formulário aberto).
+const APP_VERSION = "d99bc45bd5";   // o build do site troca pela versão publicada
+async function checkUpdate() {
+  if (APP_VERSION.startsWith("__") || document.hidden || $("dialog[open]")) return;   // app local, ou em uso
+  try {
+    const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
+    const { v } = await r.json();
+    if (!v || v === APP_VERSION) return;
+    if (new URLSearchParams(location.search).get("v") === v) return;   // já recarregou para ela; não insiste
+    location.replace(location.pathname + "?v=" + v + location.hash);   // endereço novo: o iPhone não usa a cópia guardada
+  } catch (e) { /* sem internet: tenta de novo depois */ }
+}
+checkUpdate();
+setInterval(checkUpdate, 60000);

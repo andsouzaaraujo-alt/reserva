@@ -7,6 +7,7 @@ const LIGHT_TEXT = { inter: true, nu_pf: true };
 const SHORT = { inter: "Inter", nu_pf: "Nu PF", nu_pj: "Nu PJ", bradesco: "Bradesco" };
 const MES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+const USER_NAME = "Andrea";   // nome na saudação do Início
 let S = null;            // estado vindo da planilha
 let month = null;        // mês selecionado (YYYY-MM)
 let lastMtime = 0;
@@ -649,8 +650,14 @@ $("#cl-reopen").onclick = async () => {
 // ---------------------------------------------------------------- título das páginas
 function renderPageTitle() {
   const el = $("#page-title");
-  el.hidden = view === "inicio" || !S;
+  el.hidden = !S;
   if (el.hidden) return;
+  $(".pt-v", el).hidden = view === "inicio";
+  if (view === "inicio") {   // saudação no topo do Início
+    $("h1", el).innerHTML = `Hey, <em>${USER_NAME}</em>`;
+    $(".pt-cap", el).textContent = "Here's your personal finance dashboard";
+    return;
+  }
   const money = v => { const [i, c] = brl(Math.abs(v)).split(","); return `<span class="rs">${v < 0 ? "−R$" : "R$"}</span>${i}<span class="ct">,${c}</span>`; };
   if (view === "reserva") {
     const ks = S.months.map(m => m.key);

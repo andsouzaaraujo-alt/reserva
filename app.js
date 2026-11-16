@@ -22,10 +22,25 @@ const ddmm = iso => { const [, m, d] = iso.split("-"); return `${d}/${m}`; };
 const parseAmount = s => {
   s = String(s || "").replace(/[^\d,.-]/g, "");
   if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  else if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");   // 2.300 = dois mil e trezentos
   const n = parseFloat(s);
   return isFinite(n) ? n : 0;
 };
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+// categorias = itens do custo fixo (sem as linhas automáticas "↳ ..."); uso vem da aba Lançamentos
+const catOf = s => String(s || "").split("•")[0].trim();
+const CATS = () => [...new Set((S.vida || []).filter(i => !i.derived).map(i => catOf(i.label)))];
+const budgetOf = (cat, k) => (S.vida || []).filter(i => !i.derived && catOf(i.label) === cat).reduce((a, i) => a + (i.values[k] || 0), 0);
+const usedOf = (cat, k) => (((S.usage || {})[cat] || {})[k]) || 0;
+// meta de reserva: ok, warn (sobra menos de 10% acima da meta) ou bad (abaixo da meta)
+function goalStatus(k) {
+  const p = S.per_month[k];
+  if (!p || !p.meta) return null;
+  const v = p.realizado ?? p.reserva, d = v - p.meta;
+  return { v, meta: p.meta, d, st: d < 0 ? "bad" : v < p.meta * 1.1 ? "warn" : "ok" };
+}
+const goalText = g => g.st === "bad" ? `${rs(-g.d, false)} short` : g.st === "warn" ? `only ${rs(g.d, false)} to spare` : `${rs(g.d, false)} to spare`;
 
 // Ponte do site (GitHub Pages) com o motor no Google Apps Script.
 // Cada pedido leva a chave do app, que fica guardada só neste aparelho.
@@ -106,7 +121,7 @@ function gasPreview(b) {
 const GAS_ROUTES = {
   "/api/state": "getState", "/api/expense": "addExpense", "/api/fixed": "addFixed",
   "/api/fixed/update": "updateFixed", "/api/close": "closeMonth", "/api/undo": "undo", "/api/config": "saveConfig",
-  "/api/delete": "deleteExpense",
+  "/api/delete": "deleteExpense", "/api/cash": "addCash", "/api/goal": "setGoal", "/api/entry/delete": "deleteEntry",
 };
 
 async function api(path, body) {
@@ -154,7 +169,7 @@ const CARD_GEO = { inter: () => GEO.rings(2.4), nu_pf: GEO.venn, nu_pj: GEO.pyra
 // ---------------------------------------------------------------- render
 function render() {
   if (!S) return;
-  renderRuler(); renderReserve(); renderFlow(); renderChart(); renderFixed(); renderCards(); renderPageTitle(); renderClosePrompt();
+  renderRuler(); renderReserve(); renderFlow(); renderChart(); renderFixed(); renderCards(); renderDay(); renderPageTitle(); renderClosePrompt(); renderGoalAlert();
   const t = new Date(S.mtime * 1000);
   $("#foot-time").textContent = "updated " + t.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
   const b = $("#banner");
@@ -200,7 +215,30 @@ function renderReserve() {
   save.innerHTML = `
     <div class="save-l"><span class="mono">${closed ? "Savings · actual" : v < 0 ? "Short" : "Savings · forecast"}</span><span class="label">${
       closed ? "you <em>actually</em> saved" : v < 0 ? "in the red <em>this month</em>" : "you save <em>this month</em>"}</span></div>
-    <div class="save-v"><span class="rs">${v < 0 ? "−R$" : "R$"}</span>${si}<span class="ct">,${sc}</span></div>`;
+    <div class="save-v"><span class="rs">${v < 0 ? "−R$" : "R$"}</span>${si}<span class="ct">,${sc}</span></div>
+    <div class="save-goal">${goalLine(month)}</div>`;
+}
+
+function goalLine(k) {
+  const g = goalStatus(k);
+  if (!g) return `<button type="button" class="goal-line none">◎ Set a savings goal</button>`;
+  return `<button type="button" class="goal-line ${g.st}"><i></i>Goal ${rs(g.meta, false)} · ${goalText(g)}</button>`;
+}
+
+// aviso no Início quando a meta do mês está em risco (meses que ainda não foram fechados)
+function renderGoalAlert() {
+  const el = $("#goal-alert"), g = goalStatus(month);
+  const show = g && g.st !== "ok" && S.per_month[month].realizado == null && month >= curMonth();
+  el.hidden = !show;
+  $$(".goal-line").forEach(b => b.onclick = () => openGoal(month));
+  if (!show) return;
+  el.className = `close-prompt goal-alert ${g.st}`;
+  const name = MES_LONGO[+month.slice(5) - 1];
+  el.innerHTML = `<div><span class="mono">◇ Savings goal · ${label(month)}</span><p>${g.st === "bad"
+      ? `<b>${name} is ${rs(-g.d, false)} short</b> of your ${rs(g.meta, false)} goal. Forecast: ${rs(g.v, false)}.`
+      : `<b>Careful: only ${rs(g.d, false)} to spare</b> before you miss your ${rs(g.meta, false)} goal in ${name}.`}</p></div>
+    <button type="button" class="cp-btn">Goal</button>`;
+  $(".cp-btn", el).onclick = () => openGoal(month);
 }
 
 function renderFlow() {
@@ -241,7 +279,8 @@ function renderChart() {
       const v = vals[i], closed = real[i] != null, d = closed ? real[i] - proj[i] : 0;
       return `<button class="hrow ${tier(v)} ${k === month ? "on" : ""} ${closed ? "closed" : ""}" data-m="${k}">
         <span class="m">${label(k).toUpperCase()}${closed ? `<small>actual</small>` : ""}</span>
-        <span class="track"><i style="width:${pct(v)}%"></i>${closed ? `<s style="left:${pct(proj[i])}%" title="forecast ${rs(proj[i], false)}"></s>` : ""}</span>
+        <span class="track"><i style="width:${pct(v)}%"></i>${closed ? `<s style="left:${pct(proj[i])}%" title="forecast ${rs(proj[i], false)}"></s>` : ""}${
+          S.per_month[k].meta ? `<u class="goal-mk" style="left:${pct(S.per_month[k].meta)}%" title="goal ${rs(S.per_month[k].meta, false)}"></u>` : ""}</span>
         <span class="val">${col(v, false)}${closed ? `<small class="${d >= 0 ? "up" : "down"}">${signed(d)}</small>` : ""}</span></button>`;
     }).join("")}</div>${closeAction()}`;
     $$(".hrow").forEach(b => b.onclick = () => { month = b.dataset.m; render(); });
@@ -263,6 +302,7 @@ function renderChart() {
       <rect x="${i * step}" y="0" width="${step}" height="${H}" fill="transparent"/>
       <rect class="b" x="${x}" y="${v >= 0 ? yv : y0}" width="${bw}" height="${h}"/>
       ${real[i] != null ? `<line class="ghost-l" x1="${x - 4}" x2="${x + bw + 4}" y1="${y(proj[i])}" y2="${y(proj[i])}"/>` : ""}
+      ${S.per_month[k].meta ? `<line class="goal-l" x1="${x - 6}" x2="${x + bw + 6}" y1="${y(S.per_month[k].meta)}" y2="${y(S.per_month[k].meta)}"/>` : ""}
       <text class="val" x="${tx}" y="${ty}" text-anchor="middle">${rs(v, false)}</text>
       <text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle" ${step < 50 ? `style="font-size:9px"` : ""}>${(step < 60 ? MES[+k.slice(5) - 1] : label(k)).toUpperCase()}</text></g>`;
   }).join("");
@@ -277,8 +317,20 @@ function renderChart() {
 }
 
 function renderFixed() {
-  const items = S.vida.map(i => ({ ...i, v: i.values[month] || 0 }));
-  const tot = items.reduce((a, i) => a + i.v, 0);
+  const all = S.vida.map(i => ({ ...i, v: i.values[month] || 0 }));
+  const tot = all.reduce((a, i) => a + i.v, 0);
+  const items = all.filter(i => !i.derived);
+  const extra = all.filter(i => i.derived && i.v);
+  const seen = new Set();
+  // "R$ 150 left" no primeiro item de cada categoria que já teve gasto no mês
+  const left = i => {
+    const c = catOf(i.label), u = usedOf(c, month);
+    if (!u || seen.has(c)) return "";
+    seen.add(c);
+    const l = budgetOf(c, month) - u;
+    return `<span class="left ${l < 0 ? "over" : ""}" title="${rs(u)} used">${l < 0 ? `${rs(-l, false)} over` : `${rs(l, false)} left`}</span>`;
+  };
+  const xname = l => /VISTA/i.test(l) ? "Cash, no category" : /ACIMA/i.test(l) ? "Over budget" : "Card purchases already counted above";
   const comp = S.compromissos.map(i => ({ ...i, v: i.values[month] || 0 })).filter(i => i.v);
   const clean = s => s.split("•")[0].trim();
   const tag = s => (s.split("•")[1] || "").trim();
@@ -288,8 +340,9 @@ function renderFixed() {
     <div class="cap">${items.filter(i => i.v).length} items · tap one to change it</div>
     <div class="blocks">${items.filter(i => i.v).sort((a, b) => b.v - a.v).map(i => `<div style="flex:${i.v}" title="${clean(i.label)}"></div>`).join("")}</div>
     ${items.map(i => `<button class="fx-item ${i.v ? "" : "zero"}" data-row="${i.row}">
-        <span class="nm">${clean(i.label)}</span>${tag(i.label) ? `<span class="tag">${tag(i.label)}</span>` : ""}
+        <span class="nm">${clean(i.label)}</span>${tag(i.label) ? `<span class="tag">${tag(i.label)}</span>` : ""}${left(i)}
         <span class="dots"></span><span class="v">${col(i.v)}</span></button>`).join("")}
+    ${extra.map(i => `<div class="fx-item fx-auto"><span class="nm">↳ ${xname(i.label)}</span><span class="dots"></span><span class="v">${col(i.v)}</span></div>`).join("")}
     <button class="ghost" id="add-fixed">+ Add a fixed cost</button>
     ${comp.length ? `<div class="comp"><div class="sec-head"><span class="dia">◇</span> Commitments outside cards <span class="dots"></span>${rs(comp.reduce((a, i) => a + i.v, 0))}</div>
       ${comp.map(i => `<div class="r"><span class="nm">${clean(i.label)}</span><span class="dots"></span><span class="v">${col(i.v)}</span></div>`).join("")}</div>` : ""}`;
@@ -418,19 +471,19 @@ function confirmDelete(row, it) {
 }
 
 // ---------------------------------------------------------------- nova despesa
-const F = { where: null, autoWhere: null, userPicked: false, n: 1 };
+const F = { where: null, autoWhere: null, userPicked: false, n: 1, cat: "", autoCat: null, catPicked: false };
 
 function openExpense(mode) {
   const f = $("#form-expense");
   f.reset();
-  Object.assign(F, { where: mode === "fixed" ? "fixed" : null, autoWhere: null, userPicked: mode === "fixed", n: 1 });
+  Object.assign(F, { where: mode === "fixed" ? "fixed" : null, autoWhere: null, userPicked: mode === "fixed", n: 1, cat: "", autoCat: null, catPicked: false });
   $("#f-date").value = S.today;
   $("#f-recog").hidden = true;
   const opts = S.months.map(m => `<option value="${m.key}">${label(m.key)}</option>`).join("");
   $("#f-start").innerHTML = opts;
   $("#f-start").value = month;
   $("#f-end").innerHTML = `<option value="">no end</option>` + opts;
-  renderWhere(); renderSteps(); updateMode(); preview();
+  renderWhere(); renderCats(); renderSteps(); updateMode(); preview();
   $("#dlg-expense").showModal();
   setTimeout(() => $("#f-amount").focus(), 50);
 }
@@ -440,15 +493,27 @@ function renderWhere() {
      style="--sel:${bg};--sel-t:var(--bg)">
      ${F.autoWhere === k && !F.userPicked ? `<span class="auto">◆ auto</span>` : ""}<span>${name}</span><span class="d">${sub}</span></button>`;
   $("#f-where").innerHTML = CARD_ORDER.map(k => btn(k, SHORT[k], `closes ${S.cards[k].close}`, `var(--brand-${k})`, LIGHT_TEXT[k])).join("")
+    + btn("avista", "Cash / Pix", "this month", "var(--ink)", true)
     + btn("fixed", "Fixed cost", "monthly", "var(--cobalt)", true);
   $$("#f-where button").forEach(b => b.onclick = () => { F.where = b.dataset.k; F.userPicked = true; renderWhere(); updateMode(); preview(); });
 }
 
+function renderCats() {
+  const opts = [...CATS(), ""];
+  $("#f-cat").innerHTML = opts.map(c => `<button type="button" data-c="${c.replace(/"/g, "&quot;")}" class="${F.cat === c ? "on" : ""}">${
+    F.autoCat === c && c && !F.catPicked ? `<span class="auto">◆</span>` : ""}${c || "Other"}</button>`).join("");
+  $$("#f-cat button").forEach(b => b.onclick = () => { F.cat = b.dataset.c; F.catPicked = true; renderCats(); preview(); });
+}
+
 function updateMode() {
-  const fixed = F.where === "fixed";
+  const fixed = F.where === "fixed", cash = F.where === "avista";
   $("#card-fields").hidden = fixed;
   $("#fixed-fields").hidden = !fixed;
-  $("#f-amount-hint").textContent = fixed ? "amount per month" : ($("#f-recurring").checked ? "amount per month" : "total amount");
+  $("#cat-field").hidden = fixed;
+  $("#inst-field").hidden = cash;
+  $("#p-chips").hidden = cash;
+  $("#rec-toggle").hidden = cash;
+  $("#f-amount-hint").textContent = fixed ? "amount per month" : cash ? "amount paid" : ($("#f-recurring").checked ? "amount per month" : "total amount");
   $("#f-submit").textContent = fixed ? "Add fixed cost" : "Add to spreadsheet";
 }
 
@@ -483,6 +548,11 @@ async function doPreview() {
     el.innerHTML = `<div class="when"><b>${rs(amount)}</b> a month in Living expenses, from <b>${label(s)}</b> ${e ? `to <b>${label(e)}</b>` : "onward"}.</div>`;
     return;
   }
+  if (F.where === "avista") {
+    const k = ($("#f-date").value || S.today).slice(0, 7);
+    el.innerHTML = `<div class="when">Counts in <b>${label(k)}</b> <span class="mono">paid now · not on a card bill${S.per_month[k] ? "" : " · before the spreadsheet starts"}</span></div>${budgetLine(k, amount)}`;
+    return;
+  }
   const seq = ++pvSeq;
   try {
     const p = await api("/api/preview", { card: F.where, amount: amount || 0, date: $("#f-date").value || S.today,
@@ -497,8 +567,18 @@ async function doPreview() {
     el.innerHTML = `<div class="when">Goes on <b>${card.name}</b>'s <b>${label(p.first_month)}</b> bill
         <span class="mono">closes ${ddmm(p.close_date)} · due ${ddmm(p.due_date)}${p.items.length > 1 ? ` · ${p.items.length}× of ${rs(p.items[p.items.length - 1].value)}` : ""}</span></div>
       <div class="tl">${show.map(m => `<div class="${map[m.key] ? "has" : ""}">${label(m.key)}<b>${map[m.key] ? rs(map[m.key], false) : "—"}</b></div>`).join("")}</div>
-      ${beyond ? `<div class="warn">${beyond} installment(s) after ${label(last)}: they go on the card's tab but stay out of the monthly overview.</div>` : ""}`;
+      ${beyond ? `<div class="warn">${beyond} installment(s) after ${label(last)}: they go on the card's tab but stay out of the monthly overview.</div>` : ""}
+      ${budgetLine(useMonth($("#f-date").value || S.today, p.first_month), p.items.length ? p.items[0].value : 0)}`;
   } catch (e) { el.innerHTML = `<div class="warn">${e.message}</div>`; }
+}
+
+// mês em que a compra consome a categoria: o da compra; se ele não existe na planilha, o da fatura
+const useMonth = (iso, bill) => S.per_month[iso.slice(0, 7)] ? iso.slice(0, 7) : bill;
+function budgetLine(k, add) {
+  if (!F.cat || !S.per_month[k]) return "";
+  const b = budgetOf(F.cat, k), l = b - usedOf(F.cat, k) - (add || 0);
+  return `<div class="budget ${l < 0 ? "over" : ""}"><b>${F.cat}</b> · ${label(k)}: ${l >= 0
+    ? `${rs(l)} left of ${rs(b, false)} after this` : `${rs(-l)} over the ${rs(b, false)} budget`}</div>`;
 }
 
 function validate() {
@@ -515,6 +595,11 @@ $("#f-desc").addEventListener("input", () => {
     const q = $("#f-desc").value.trim();
     const box = $("#f-recog");
     if (q.length < 2) { box.hidden = true; return; }
+    // o último lançamento com essa descrição sugere categoria (e forma de pagamento)
+    const nq = q.toLowerCase();
+    const prev = (S.log || []).slice().reverse().find(e => e.desc.toLowerCase().startsWith(nq));
+    if (prev && prev.cat && !F.catPicked && CATS().includes(prev.cat)) { F.autoCat = prev.cat; F.cat = prev.cat; renderCats(); preview(); }
+    if (prev && prev.pay === "avista" && !F.userPicked) { F.autoWhere = "avista"; F.where = "avista"; renderWhere(); updateMode(); preview(); box.hidden = true; return; }
     const hits = await api("/api/suggest?q=" + encodeURIComponent(q)).catch(() => []);
     if (!hits.length) { box.hidden = true; F.autoWhere = null; renderWhere(); return; }
     const top = hits[0];
@@ -536,18 +621,28 @@ $("#form-expense").addEventListener("submit", async ev => {
   const amount = parseAmount($("#f-amount").value);
   const desc = $("#f-desc").value.trim();
   try {
-    let r, msg;
+    let r, msg, catK = null;
     if (F.where === "fixed") {
       r = await write("/api/fixed", { label: desc, amount, start: $("#f-start").value, end: $("#f-end").value || null });
       msg = `${desc} added to fixed costs · ${rs(amount)}/mo`;
+    } else if (F.where === "avista") {
+      const date = $("#f-date").value || S.today;
+      r = await write("/api/cash", { description: desc, amount, date, category: F.cat });
+      msg = `${desc} · ${rs(amount)} · paid now`;
+      catK = date.slice(0, 7);
     } else {
-      const rec = $("#f-recurring").checked;
-      r = await write("/api/expense", { description: desc, amount, date: $("#f-date").value || S.today, card: F.where, installments: F.n, recurring: rec });
+      const rec = $("#f-recurring").checked, date = $("#f-date").value || S.today;
+      r = await write("/api/expense", { description: desc, amount, date, card: F.where, installments: F.n, recurring: rec, category: F.cat });
       const it = r.schedule.items;
       msg = `${S.cards[F.where].name} · ${rec ? "monthly" : it.length > 1 ? `${it.length}× ${rs(it[it.length - 1].value)}` : rs(amount)} · ${label(r.schedule.first_month)} bill`;
+      catK = useMonth(date, r.schedule.first_month);
     }
     $("#dlg-expense").close();
     await refresh(r);
+    if (F.cat && catK && S.per_month[catK]) {
+      const l = budgetOf(F.cat, catK) - usedOf(F.cat, catK);
+      msg += ` · ${F.cat}: ${l >= 0 ? `${rs(l, false)} left` : `${rs(-l, false)} over`}`;
+    }
     toast(msg, r.undo);
   } catch (e) { alert(e.message); }
   finally { updateMode(); validate(); }
@@ -600,11 +695,16 @@ const closable = k => k <= curMonth();      // dá para fechar o mês corrente a
 
 // botão no fim da lista da Reserva, para o mês selecionado
 function closeAction() {
-  if (!closable(month)) return `<p class="close-hint mono">${label(month)} hasn't started · you can close it from the current month on</p>`;
+  const meta = S.per_month[month].meta;
+  const goal = `<button class="ghost goal-btn" type="button">${meta ? `Savings goal for ${label(month)}: ${rs(meta, false)} · edit` : `Set a savings goal`}</button>`;
+  if (!closable(month)) return goal + `<p class="close-hint mono">${label(month)} hasn't started · you can close it from the current month on</p>`;
   const closed = S.per_month[month].realizado != null;
-  return `<button class="ghost close-btn" type="button">${closed ? `Edit actual for ${label(month)}` : `Close ${label(month)}: enter what I saved`}</button>`;
+  return goal + `<button class="ghost close-btn" type="button">${closed ? `Edit actual for ${label(month)}` : `Close ${label(month)}: enter what I saved`}</button>`;
 }
-function bindCloseAction() { const b = $("#chart .close-btn"); if (b) b.onclick = () => openClose(month); }
+function bindCloseAction() {
+  const b = $("#chart .close-btn"); if (b) b.onclick = () => openClose(month);
+  const g = $("#chart .goal-btn"); if (g) g.onclick = () => openGoal(month);
+}
 
 // aviso no Início: o mês mais antigo que já acabou e ainda não foi fechado
 function renderClosePrompt() {
@@ -647,6 +747,71 @@ $("#cl-reopen").onclick = async () => {
   catch (e) { alert(e.message); }
 };
 
+// ---------------------------------------------------------------- meta de reserva
+let GL = null;
+function openGoal(k) {
+  GL = k;
+  const meta = S.per_month[k].meta;
+  $("#gl-title").textContent = `From ${MES_LONGO[+k.slice(5) - 1]} ${k.slice(0, 4)}`;
+  $("#gl-amount").value = meta ? brl(meta) : "";
+  $("#gl-only").checked = false;
+  $("#gl-only").onchange = () => { $("#gl-title").textContent = `${$("#gl-only").checked ? "Only" : "From"} ${MES_LONGO[+k.slice(5) - 1]} ${k.slice(0, 4)}`; };
+  $("#dlg-goal").showModal();
+  setTimeout(() => $("#gl-amount").focus(), 50);
+}
+$("#gl-amount").addEventListener("input", e => { const c = e.target.value.replace(/[^\d.,]/g, ""); if (c !== e.target.value) e.target.value = c; });
+$("#form-goal").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const raw = $("#gl-amount").value.trim(), amount = raw ? parseAmount(raw) : null, only = $("#gl-only").checked;
+  try {
+    const r = await write("/api/goal", { month: GL, amount, only });
+    $("#dlg-goal").close();
+    await refresh(r);
+    toast(amount ? `Goal ${rs(amount, false)} · ${only ? label(GL) : `from ${label(GL)} on`}` : `Goal removed${only ? ` for ${label(GL)}` : ""}`);
+  } catch (e) { alert(e.message); }
+});
+
+// ---------------------------------------------------------------- Today: gastos do dia
+let DAY = null;
+const isoAdd = (iso, n) => { const d = new Date(iso + "T12:00"); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+const weekday = iso => new Date(iso + "T12:00").toLocaleDateString("en-US", { weekday: "long" });
+const dayItems = () => (S.log || []).filter(e => e.date === DAY).sort((a, b) => b.row - a.row);
+function renderDay() {
+  if (!DAY || DAY > S.today) DAY = S.today;
+  $("#d-label").textContent = `${DAY === S.today ? "Today" : weekday(DAY)} · ${ddmm(DAY)}`;
+  $("#d-input").value = DAY;
+  $("#d-input").max = S.today;
+  $("#d-next").disabled = DAY >= S.today;
+  const items = dayItems();
+  const kind = e => [e.pay === "avista" ? "Cash / Pix" : e.payName, e.n && e.n !== "1×" ? e.n : "", e.cat].filter(Boolean).join(" · ");
+  $("#day").innerHTML = `<div class="sec-head"><span class="dia">◇</span> What you spent <span class="dots"></span>${ddmm(DAY)}</div>
+    <div class="cd-list" id="day-list">${items.length ? items.map((e, i) => `
+      <div class="cd-row" data-i="${i}">
+        <div class="cd-main"><span class="cd-name">${e.desc.replace(/</g, "&lt;")}</span><span class="cd-kind mono">${kind(e)}</span></div>
+        <span class="cd-v">${col(e.value)}</span>
+        <button type="button" class="cd-del" aria-label="Delete ${e.desc.replace(/"/g, "")}">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 7h16M10 7V4h4v3M6 7l1 13h10l1-13M10 11v6M14 11v6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>`).join("") : `<p class="note">Nothing added on this day.</p>`}</div>
+    <p class="cards-hint mono">only expenses added in the app show up here · installments count in full on the day you buy</p>`;
+  $$("#day-list .cd-row").forEach(row => { const e = items[+row.dataset.i]; $(".cd-del", row).onclick = () => confirmDeleteEntry(row, e); });
+}
+function confirmDeleteEntry(row, e) {
+  row.classList.add("confirm");
+  row.innerHTML = `<p class="cd-q">Delete <b>${e.desc.replace(/</g, "&lt;")}</b> from the spreadsheet?${e.pay !== "avista" ? " It also leaves the card bill, with all its months." : ""}</p>
+    <div class="cd-actions"><button type="button" class="cd-no">Cancel</button><button type="button" class="cd-yes">Delete</button></div>`;
+  $(".cd-no", row).onclick = () => renderDay();
+  $(".cd-yes", row).onclick = async () => {
+    row.classList.add("leaving");
+    toast(`Deleting ${e.desc}…`);
+    try { const r = await write("/api/entry/delete", { row: e.row, desc: e.desc }); await refresh(r); toast(`Deleted: ${e.desc}`); }
+    catch (err) { alert("Couldn't delete: " + err.message); renderDay(); }
+  };
+}
+$("#d-prev").onclick = () => { DAY = isoAdd(DAY, -1); renderDay(); renderPageTitle(); };
+$("#d-next").onclick = () => { if (DAY < S.today) { DAY = isoAdd(DAY, 1); renderDay(); renderPageTitle(); } };
+$("#d-input").addEventListener("change", e => { if (e.target.value) { DAY = e.target.value > S.today ? S.today : e.target.value; renderDay(); renderPageTitle(); } });
+
 // ---------------------------------------------------------------- título das páginas
 function renderPageTitle() {
   const el = $("#page-title");
@@ -659,6 +824,14 @@ function renderPageTitle() {
     return;
   }
   const money = v => { const [i, c] = brl(Math.abs(v)).split(","); return `<span class="rs">${v < 0 ? "−R$" : "R$"}</span>${i}<span class="ct">,${c}</span>`; };
+  if (view === "dia") {
+    const items = dayItems(), tot = items.reduce((a, e) => a + e.value, 0);
+    const mtd = (S.log || []).filter(e => e.date.slice(0, 7) === DAY.slice(0, 7) && e.date <= DAY).reduce((a, e) => a + e.value, 0);
+    $("h1", el).innerHTML = DAY === S.today ? `Spent <em>today</em>` : `Spent on <em>${weekday(DAY)}</em>`;
+    $(".pt-v", el).innerHTML = money(tot);
+    $(".pt-cap", el).textContent = `${items.length} ${items.length === 1 ? "expense" : "expenses"} · ${rs(mtd)} in ${MES_LONGO[+DAY.slice(5, 7) - 1]} so far`;
+    return;
+  }
   if (view === "reserva") {
     const ks = S.months.map(m => m.key);
     const closedKs = ks.filter(k => S.per_month[k].realizado != null);
@@ -681,7 +854,7 @@ function renderPageTitle() {
 }
 
 // ---------------------------------------------------------------- menu / telas
-const VIEWS = ["inicio", "reserva", "cartoes"];
+const VIEWS = ["inicio", "dia", "reserva", "cartoes"];
 let view = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "inicio";
 function go(v, push = true) {
   view = v;
@@ -690,7 +863,7 @@ function go(v, push = true) {
     b.classList.toggle("on", b.dataset.go === v);
     b.setAttribute("aria-current", b.dataset.go === v ? "page" : "false");
   });
-  $(".monthbar").hidden = v === "reserva";   // o gráfico já mostra todos os meses
+  $(".monthbar").hidden = v === "reserva" || v === "dia";   // o gráfico já mostra todos os meses; Today escolhe o dia
   renderPageTitle();
   if (push && location.hash !== "#" + v) history.replaceState(null, "", "#" + v);
   if (S && v === "reserva") renderChart();     // precisa da largura visível para desenhar
@@ -765,7 +938,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) { lo
 // ---------------------------------------------------------------- versão nova do site
 // O ícone na tela do iPhone guarda a página antiga por um tempo. Aqui o app pergunta ao site
 // qual é a versão publicada e, se for outra, recarrega sozinho (nunca com um formulário aberto).
-const APP_VERSION = "d99bc45bd5";   // o build do site troca pela versão publicada
+const APP_VERSION = "a0bd6a8ec4";   // o build do site troca pela versão publicada
 async function checkUpdate() {
   if (APP_VERSION.startsWith("__") || document.hidden || $("dialog[open]")) return;   // app local, ou em uso
   try {

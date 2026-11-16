@@ -14,7 +14,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="app.css?v=1794673754">
+<link rel="stylesheet" href="app.css?v=1794828777">
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iIzJDNEJDMiIvPgogIDxnIHN0cm9rZT0iIzE0MTQxNCIgc3Ryb2tlLXdpZHRoPSIwLjkiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCI+CiAgICA8ZWxsaXBzZSBjeD0iNDYiIGN5PSI1MiIgcng9IjI1IiByeT0iMzMiIHRyYW5zZm9ybT0icm90YXRlKC0yMiA0NiA1MikiIGZpbGw9IiM3RkIzREEiLz4KICAgIDxwYXRoIGQ9Ik02Mi4xIDc4LjggTDU0LjEgODMuOCBNNTcuMiA3OC45IEw0OS4yIDgzLjkgTTUyLjIgNzcuOSBMNDQuMiA4Mi45IE00Ny4yIDc1LjggTDM5LjIgODAuOCBNNDIuNSA3Mi42IEwzNC41IDc3LjYgTTM4LjIgNjguNCBMMzAuMiA3My40IE0zNC41IDYzLjUgTDI2LjUgNjguNSBNMzEuNSA1OC4wIEwyMy41IDYzLjAgTTI5LjMgNTIuMCBMMjEuMyA1Ny4wIE0yOC4xIDQ1LjkgTDIwLjEgNTAuOSBNMjcuNyAzOS44IEwxOS43IDQ0LjggTTI4LjQgMzQuMCBMMjAuNCAzOS4wIE0zMC4wIDI4LjcgTDIyLjAgMzMuNyBNMzIuNSAyNC4wIEwyNC41IDI5LjAgTTM1LjcgMjAuMiBMMjcuNyAyNS4yIiBmaWxsPSJub25lIiBzdHJva2Utd2lkdGg9IjAuNyIvPgogICAgPGVsbGlwc2UgY3g9IjU0IiBjeT0iNDciIHJ4PSIyNSIgcnk9IjMzIiB0cmFuc2Zvcm09InJvdGF0ZSgtMjIgNTQgNDcpIiBmaWxsPSIjQTlEM0VFIi8+CiAgICA8ZWxsaXBzZSBjeD0iNTQiIGN5PSI0NyIgcng9IjE4IiByeT0iMjUiIHRyYW5zZm9ybT0icm90YXRlKC0yMiA1NCA0NykiIGZpbGw9Im5vbmUiIHN0cm9rZS13aWR0aD0iMC43Ii8+CiAgPC9nPgogIDxnIHRyYW5zZm9ybT0icm90YXRlKC0yMiA1NCA0NykiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzE0MTQxNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIj4KICAgIDxwYXRoIGQ9Ik01NCAzMSBWNjMiIHN0cm9rZS13aWR0aD0iMyIvPgogICAgPHBhdGggZD0iTTYxLjUgMzggQzYwIDMzLCA0Ny41IDMyLjUsIDQ3IDM4LjUgQzQ2LjUgNDQuNSwgNjEuNSA0My41LCA2MS41IDUxLjUgQzYxLjUgNTkuNSwgNDcgNjAsIDQ2IDU0IiBzdHJva2Utd2lkdGg9IjUuMiIvPgogIDwvZz4KPC9zdmc+Cg==">
 </head>
 <body>
@@ -49,6 +49,7 @@
   <!-- Início -->
   <div class="view" data-view="inicio">
     <div class="close-prompt" id="close-prompt" hidden></div>
+    <div class="close-prompt goal-alert" id="goal-alert" hidden></div>
     <section class="hero">
       <div class="hero-l">
         <article class="panel notch reserve" id="reserve"></article>
@@ -68,6 +69,16 @@
     </section>
   </div>
 
+  <!-- Today: gastos do dia -->
+  <div class="view" data-view="dia" hidden>
+    <nav class="mpick daybar" aria-label="Day">
+      <button class="icon-btn" id="d-prev" aria-label="Previous day">‹</button>
+      <label class="msel dsel"><span class="d-lab" id="d-label"></span><input type="date" id="d-input" aria-label="Pick a day"></label>
+      <button class="icon-btn" id="d-next" aria-label="Next day">›</button>
+    </nav>
+    <article class="panel notch day" id="day"></article>
+  </div>
+
   <!-- Cartões -->
   <div class="view" data-view="cartoes" hidden>
     <article class="cards" id="cards"></article>
@@ -82,6 +93,9 @@
 <nav class="tabbar" aria-label="Menu">
   <button data-go="inicio" aria-label="Home">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7v9h-5.5v-6h-5v6H4z"/></svg><span>Home</span>
+  </button>
+  <button data-go="dia" aria-label="Today">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/><rect x="7.5" y="12.5" width="3" height="3"/></svg><span>Today</span>
   </button>
   <button data-go="reserva" aria-label="Savings">
     <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12"/><circle cx="12" cy="12" r="3"/><path d="M5.5 9v0M18.5 15v0" stroke-linecap="square"/></svg><span>Savings</span>
@@ -121,13 +135,18 @@
       <div class="where" id="f-where"></div>
     </div>
 
+    <div class="field" id="cat-field">
+      <span class="lab mono">Category <span class="lab-hint">· comes out of this fixed cost</span></span>
+      <div class="cats" id="f-cat"></div>
+    </div>
+
     <div id="card-fields">
       <div class="row-2">
         <div class="field">
           <label class="lab mono" for="f-date">Purchase date</label>
           <input id="f-date" type="date" class="in">
         </div>
-        <div class="field">
+        <div class="field" id="inst-field">
           <span class="lab mono">Installments</span>
           <div class="stepper">
             <button type="button" id="p-minus" aria-label="Fewer">−</button>
@@ -137,7 +156,7 @@
         </div>
       </div>
       <div class="chips" id="p-chips"></div>
-      <label class="toggle"><input type="checkbox" id="f-recurring"><span></span> Subscription / repeats monthly</label>
+      <label class="toggle" id="rec-toggle"><input type="checkbox" id="f-recurring"><span></span> Subscription / repeats monthly</label>
     </div>
 
     <div id="fixed-fields" hidden>
@@ -214,6 +233,25 @@
   </form>
 </dialog>
 
+<!-- Meta de reserva -->
+<dialog class="sheet" id="dlg-goal">
+  <form method="dialog" class="sheet-in" id="form-goal">
+    <div class="sheet-head">
+      <span class="mono"><span class="dia">◇</span> Savings goal</span>
+      <button type="button" class="icon-btn" data-close aria-label="Close">✕</button>
+    </div>
+    <h3 class="serif" id="gl-title"></h3>
+    <label class="amount small">
+      <span class="cur">R$</span>
+      <input id="gl-amount" inputmode="decimal" placeholder="0,00">
+    </label>
+    <div class="amount-hint mono">how much you want to save each month</div>
+    <label class="toggle"><input type="checkbox" id="gl-only"><span></span> Only this month</label>
+    <p class="note">The app warns you when the month's forecast gets close to the goal (yellow) or falls below it (red). Leave it empty to remove the goal.</p>
+    <button class="submit" type="submit">Save goal</button>
+  </form>
+</dialog>
+
 <!-- Ajustes -->
 <dialog class="sheet" id="dlg-settings">
   <form method="dialog" class="sheet-in" id="form-settings">
@@ -227,6 +265,6 @@
   </form>
 </dialog>
 
-<script src="app.js?v=1794748559"></script>
+<script src="app.js?v=1794828777"></script>
 </body>
 </html>

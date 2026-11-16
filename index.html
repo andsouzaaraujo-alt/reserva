@@ -14,7 +14,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="app.css?v=1794828777">
+<link rel="stylesheet" href="app.css?v=1794833684">
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iIzJDNEJDMiIvPgogIDxnIHN0cm9rZT0iIzE0MTQxNCIgc3Ryb2tlLXdpZHRoPSIwLjkiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCI+CiAgICA8ZWxsaXBzZSBjeD0iNDYiIGN5PSI1MiIgcng9IjI1IiByeT0iMzMiIHRyYW5zZm9ybT0icm90YXRlKC0yMiA0NiA1MikiIGZpbGw9IiM3RkIzREEiLz4KICAgIDxwYXRoIGQ9Ik02Mi4xIDc4LjggTDU0LjEgODMuOCBNNTcuMiA3OC45IEw0OS4yIDgzLjkgTTUyLjIgNzcuOSBMNDQuMiA4Mi45IE00Ny4yIDc1LjggTDM5LjIgODAuOCBNNDIuNSA3Mi42IEwzNC41IDc3LjYgTTM4LjIgNjguNCBMMzAuMiA3My40IE0zNC41IDYzLjUgTDI2LjUgNjguNSBNMzEuNSA1OC4wIEwyMy41IDYzLjAgTTI5LjMgNTIuMCBMMjEuMyA1Ny4wIE0yOC4xIDQ1LjkgTDIwLjEgNTAuOSBNMjcuNyAzOS44IEwxOS43IDQ0LjggTTI4LjQgMzQuMCBMMjAuNCAzOS4wIE0zMC4wIDI4LjcgTDIyLjAgMzMuNyBNMzIuNSAyNC4wIEwyNC41IDI5LjAgTTM1LjcgMjAuMiBMMjcuNyAyNS4yIiBmaWxsPSJub25lIiBzdHJva2Utd2lkdGg9IjAuNyIvPgogICAgPGVsbGlwc2UgY3g9IjU0IiBjeT0iNDciIHJ4PSIyNSIgcnk9IjMzIiB0cmFuc2Zvcm09InJvdGF0ZSgtMjIgNTQgNDcpIiBmaWxsPSIjQTlEM0VFIi8+CiAgICA8ZWxsaXBzZSBjeD0iNTQiIGN5PSI0NyIgcng9IjE4IiByeT0iMjUiIHRyYW5zZm9ybT0icm90YXRlKC0yMiA1NCA0NykiIGZpbGw9Im5vbmUiIHN0cm9rZS13aWR0aD0iMC43Ii8+CiAgPC9nPgogIDxnIHRyYW5zZm9ybT0icm90YXRlKC0yMiA1NCA0NykiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzE0MTQxNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIj4KICAgIDxwYXRoIGQ9Ik01NCAzMSBWNjMiIHN0cm9rZS13aWR0aD0iMyIvPgogICAgPHBhdGggZD0iTTYxLjUgMzggQzYwIDMzLCA0Ny41IDMyLjUsIDQ3IDM4LjUgQzQ2LjUgNDQuNSwgNjEuNSA0My41LCA2MS41IDUxLjUgQzYxLjUgNTkuNSwgNDcgNjAsIDQ2IDU0IiBzdHJva2Utd2lkdGg9IjUuMiIvPgogIDwvZz4KPC9zdmc+Cg==">
 </head>
 <body>
@@ -64,6 +64,7 @@
   <div class="view" data-view="reserva" hidden>
     <section class="panel notch chart-panel">
       <div class="sec-head"><span class="dia">◇</span> By month <span class="dots"></span></div>
+      <button type="button" class="goals-cta" id="goals-btn"></button>
       <div class="tiers mono"><span><i class="t-low"></i>up to 3k</span><span><i class="t-mid"></i>3k to 5k</span><span><i class="t-high"></i>5k or more</span></div>
       <div class="chart" id="chart"></div>
     </section>
@@ -233,22 +234,26 @@
   </form>
 </dialog>
 
-<!-- Meta de reserva -->
-<dialog class="sheet" id="dlg-goal">
-  <form method="dialog" class="sheet-in" id="form-goal">
+<!-- Metas de reserva: todos os meses de uma vez, ou mês a mês -->
+<dialog class="sheet" id="dlg-goals">
+  <form method="dialog" class="sheet-in" id="form-goals">
     <div class="sheet-head">
-      <span class="mono"><span class="dia">◇</span> Savings goal</span>
+      <span class="mono"><span class="dia">◇</span> Savings goals</span>
       <button type="button" class="icon-btn" data-close aria-label="Close">✕</button>
     </div>
-    <h3 class="serif" id="gl-title"></h3>
-    <label class="amount small">
-      <span class="cur">R$</span>
-      <input id="gl-amount" inputmode="decimal" placeholder="0,00">
-    </label>
-    <div class="amount-hint mono">how much you want to save each month</div>
-    <label class="toggle"><input type="checkbox" id="gl-only"><span></span> Only this month</label>
-    <p class="note">The app warns you when the month's forecast gets close to the goal (yellow) or falls below it (red). Leave it empty to remove the goal.</p>
-    <button class="submit" type="submit">Save goal</button>
+    <h3 class="serif">Goals <em>month by month</em></h3>
+    <div class="field">
+      <span class="lab mono">Same goal every month</span>
+      <div class="gl-all-row">
+        <label class="amount small"><span class="cur">R$</span><input id="gl-all" inputmode="decimal" placeholder="0,00"></label>
+        <button type="button" class="cp-btn" id="gl-apply">Apply to all</button>
+      </div>
+      <div class="gl-sugg" id="gl-sugg"></div>
+    </div>
+    <p class="gl-sum mono" id="gl-sum"></p>
+    <div class="gl-list" id="gl-list"></div>
+    <p class="note">Change any month on its own. "Apply to all" skips months you already closed. Leave a month empty for no goal.</p>
+    <button class="submit" type="submit">Save goals</button>
   </form>
 </dialog>
 
@@ -265,6 +270,6 @@
   </form>
 </dialog>
 
-<script src="app.js?v=1794832686"></script>
+<script src="app.js?v=1794833684"></script>
 </body>
 </html>

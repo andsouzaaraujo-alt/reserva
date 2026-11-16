@@ -611,3 +611,32 @@ button.band:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; 
 .daybar .d-lab { position: static; transform: none; font-family: var(--mono); font-size: 13px; text-transform: uppercase; letter-spacing: .06em; pointer-events: none; }
 .daybar input[type=date] { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; border: 0; cursor: pointer; }
 .daybar #d-prev, .daybar #d-next { border: 0; }
+
+/* ---------------------------------------------------------------- tela de metas */
+.goals-cta { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 2px 0 14px;
+  padding: 12px 14px; background: var(--ink); color: var(--bg); border: 0; text-align: left;
+  font-family: var(--mono); font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+.goals-cta small { display: block; text-transform: none; letter-spacing: 0; color: var(--olive); font-size: 10.5px; margin-top: 3px; }
+.goals-cta b { font-size: 20px; font-weight: 400; line-height: 1; }
+.gl-all-row { display: flex; gap: 8px; align-items: center; }
+.gl-all-row .amount { flex: 1; margin: 0; }
+.gl-sugg { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.gl-sugg button { border: 1px solid var(--line); background: var(--paper); padding: 8px 10px; font-size: 12.5px; }
+.gl-sugg button:hover { background: var(--paper-2); }
+.gl-sum { margin: 16px 0 2px; color: var(--ink-2); font-size: 11px; }
+.gl-list { display: flex; flex-direction: column; }
+.gl-row { display: grid; grid-template-columns: 1fr 10px 138px; gap: 12px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--hair); }
+.gl-row.focus { background: var(--paper); box-shadow: -8px 0 0 var(--paper), 8px 0 0 var(--paper); }
+.gl-m { font-family: var(--mono); font-size: 12px; font-weight: 600; }
+.gl-m small { display: block; font-weight: 400; color: var(--mute); font-size: 10px; margin-top: 2px; }
+.gl-dot { width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--hair); }
+.gl-row.ok .gl-dot { background: #2F7A45; border-color: #2F7A45; }
+.gl-row.warn .gl-dot { background: var(--orange); border-color: var(--orange); }
+.gl-row.bad .gl-dot { background: var(--red); border-color: var(--red); }
+.gl-in { display: flex; align-items: center; border: 1px solid var(--line); background: var(--paper); padding: 0 10px; min-height: 42px; }
+.gl-in span { font-size: 11px; color: var(--mute); margin-right: 6px; }
+.gl-in input { border: 0; background: transparent; width: 100%; min-width: 0; font: inherit; font-size: 16px; font-weight: 600; text-align: right; outline: none; }
+.gl-in input::placeholder { font-weight: 400; font-size: 13px; color: var(--mute); }
+.gl-in:focus-within { box-shadow: inset 0 0 0 1.5px var(--ink); }
+.day-total { border-top: 1px solid var(--line); border-bottom: 0; padding-top: 12px; margin-top: 4px; }
+.day-total .mono { color: var(--ink); }

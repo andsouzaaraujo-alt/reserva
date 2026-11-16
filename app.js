@@ -121,7 +121,7 @@ function gasPreview(b) {
 const GAS_ROUTES = {
   "/api/state": "getState", "/api/expense": "addExpense", "/api/fixed": "addFixed",
   "/api/fixed/update": "updateFixed", "/api/close": "closeMonth", "/api/undo": "undo", "/api/config": "saveConfig",
-  "/api/delete": "deleteExpense", "/api/cash": "addCash", "/api/goal": "setGoal", "/api/entry/delete": "deleteEntry", "/api/import": "importCardHistory",
+  "/api/delete": "deleteExpense", "/api/cash": "addCash", "/api/goal": "setGoal", "/api/entry/delete": "deleteEntry", "/api/import": "importCardHistory", "/api/goals": "setGoals",
 };
 
 async function api(path, body) {
@@ -169,7 +169,7 @@ const CARD_GEO = { inter: () => GEO.rings(2.4), nu_pf: GEO.venn, nu_pj: GEO.pyra
 // ---------------------------------------------------------------- render
 function render() {
   if (!S) return;
-  renderRuler(); renderReserve(); renderFlow(); renderChart(); renderFixed(); renderCards(); renderDay(); renderPageTitle(); renderClosePrompt(); renderGoalAlert();
+  renderRuler(); renderReserve(); renderFlow(); renderChart(); renderGoalsBtn(); renderFixed(); renderCards(); renderDay(); renderPageTitle(); renderClosePrompt(); renderGoalAlert();
   const t = new Date(S.mtime * 1000);
   $("#foot-time").textContent = "updated " + t.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
   const b = $("#banner");
@@ -695,15 +695,21 @@ const closable = k => k <= curMonth();      // dá para fechar o mês corrente a
 
 // botão no fim da lista da Reserva, para o mês selecionado
 function closeAction() {
-  const meta = S.per_month[month].meta;
-  const goal = `<button class="ghost goal-btn" type="button">${meta ? `Savings goal for ${label(month)}: ${rs(meta, false)} · edit` : `Set a savings goal`}</button>`;
-  if (!closable(month)) return goal + `<p class="close-hint mono">${label(month)} hasn't started · you can close it from the current month on</p>`;
+  if (!closable(month)) return `<p class="close-hint mono">${label(month)} hasn't started · you can close it from the current month on</p>`;
   const closed = S.per_month[month].realizado != null;
-  return goal + `<button class="ghost close-btn" type="button">${closed ? `Edit actual for ${label(month)}` : `Close ${label(month)}: enter what I saved`}</button>`;
+  return `<button class="ghost close-btn" type="button">${closed ? `Edit actual for ${label(month)}` : `Close ${label(month)}: enter what I saved`}</button>`;
 }
-function bindCloseAction() {
-  const b = $("#chart .close-btn"); if (b) b.onclick = () => openClose(month);
-  const g = $("#chart .goal-btn"); if (g) g.onclick = () => openGoal(month);
+function bindCloseAction() { const b = $("#chart .close-btn"); if (b) b.onclick = () => openClose(month); }
+
+// resumo das metas no botão do topo da Savings
+function renderGoalsBtn() {
+  const ks = S.months.map(m => m.key).filter(k => !isClosed(k));
+  const metas = ks.map(k => S.per_month[k].meta || 0), set = metas.filter(v => v > 0);
+  const on = ks.filter(k => S.per_month[k].meta && forecastOf(k) >= S.per_month[k].meta).length;
+  const uniq = [...new Set(metas)];
+  $("#goals-btn").innerHTML = !set.length ? `<span>◎ Set your savings goals</span><b>›</b>`
+    : `<span>◎ Goals · ${uniq.length === 1 ? `${rs(uniq[0], false)} every month` : "set month by month"}<small>${on} of ${set.length} on track</small></span><b>›</b>`;
+  $("#goals-btn").onclick = () => openGoals(month);
 }
 
 // aviso no Início: o mês mais antigo que já acabou e ainda não foi fechado
@@ -747,29 +753,76 @@ $("#cl-reopen").onclick = async () => {
   catch (e) { alert(e.message); }
 };
 
-// ---------------------------------------------------------------- meta de reserva
-let GL = null;
-function openGoal(k) {
-  GL = k;
-  const meta = S.per_month[k].meta;
-  $("#gl-title").textContent = `From ${MES_LONGO[+k.slice(5) - 1]} ${k.slice(0, 4)}`;
-  $("#gl-amount").value = meta ? brl(meta) : "";
-  $("#gl-only").checked = false;
-  $("#gl-only").onchange = () => { $("#gl-title").textContent = `${$("#gl-only").checked ? "Only" : "From"} ${MES_LONGO[+k.slice(5) - 1]} ${k.slice(0, 4)}`; };
-  $("#dlg-goal").showModal();
-  setTimeout(() => $("#gl-amount").focus(), 50);
+// ---------------------------------------------------------------- metas de reserva (tela Goals)
+const forecastOf = k => S.per_month[k].realizado ?? S.per_month[k].reserva;
+const isClosed = k => S.per_month[k].realizado != null;
+const statusFor = (v, g) => !(g > 0) ? "" : v < g ? "bad" : v < g * 1.1 ? "warn" : "ok";
+const floorTo = (v, step) => Math.max(0, Math.floor(v / step) * step);
+const glRows = () => $$("#gl-list .gl-row");
+const glVal = row => { const t = $("input", row).value.trim(); return t ? parseAmount(t) : null; };
+
+function openGoals(focusK) {
+  const ks = S.months.map(m => m.key);
+  const open = ks.filter(k => !isClosed(k));
+  $("#gl-list").innerHTML = ks.map(k => {
+    const v = forecastOf(k), g = S.per_month[k].meta;
+    return `<div class="gl-row ${statusFor(v, g)}" data-k="${k}">
+      <span class="gl-m">${label(k).toUpperCase()}<small>${isClosed(k) ? "actual" : "forecast"} ${rs(v, false)}</small></span>
+      <i class="gl-dot"></i>
+      <label class="gl-in"><span>R$</span><input inputmode="decimal" placeholder="no goal" value="${g ? brl(g) : ""}" aria-label="Goal for ${label(k)}"></label>
+    </div>`;
+  }).join("");
+  // o mesmo valor em todos os meses abertos? então ele aparece no campo de cima
+  const metas = [...new Set(open.map(k => S.per_month[k].meta || 0))];
+  $("#gl-all").value = metas.length === 1 && metas[0] ? brl(metas[0]) : "";
+  // sugestões: o máximo que cabe em todos os meses, e a média da projeção
+  const fc = open.map(forecastOf).filter(v => v > 0);
+  const fits = fc.length ? floorTo(Math.min(...fc), 50) : 0, avg = fc.length ? floorTo(fc.reduce((x, y) => x + y, 0) / fc.length, 50) : 0;
+  const sug = [];
+  if (fits > 0) sug.push([fits, `${rs(fits, false)} · fits every month`]);
+  if (avg > fits) sug.push([avg, `${rs(avg, false)} · your average`]);
+  $("#gl-sugg").innerHTML = sug.map(([v, t]) => `<button type="button" data-v="${v}">${t}</button>`).join("");
+  $$("#gl-sugg button").forEach(b => b.onclick = () => { $("#gl-all").value = brl(+b.dataset.v); applyAll(); });
+  glRows().forEach(row => $("input", row).addEventListener("input", e => {
+    const c = e.target.value.replace(/[^\d.,]/g, ""); if (c !== e.target.value) e.target.value = c;
+    glUpdate();
+  }));
+  glUpdate();
+  $("#dlg-goals").showModal();
+  const row = focusK && $(`#gl-list .gl-row[data-k="${focusK}"]`);
+  if (row) setTimeout(() => { row.scrollIntoView({ block: "center" }); row.classList.add("focus"); }, 60);
 }
-$("#gl-amount").addEventListener("input", e => { const c = e.target.value.replace(/[^\d.,]/g, ""); if (c !== e.target.value) e.target.value = c; });
-$("#form-goal").addEventListener("submit", async ev => {
+function applyAll() {
+  const t = $("#gl-all").value.trim(), v = t ? parseAmount(t) : null;
+  glRows().forEach(row => { if (!isClosed(row.dataset.k)) $("input", row).value = v ? brl(v) : ""; });
+  glUpdate();
+}
+// bolinha de cada mês e resumo: quantos meses batem a meta
+function glUpdate() {
+  let n = 0, on = 0, sum = 0;
+  glRows().forEach(row => {
+    const g = glVal(row), st = statusFor(forecastOf(row.dataset.k), g);
+    row.classList.remove("ok", "warn", "bad"); if (st) row.classList.add(st);
+    if (g > 0) { n++; sum += g; if (st !== "bad") on++; }
+  });
+  $("#gl-sum").textContent = n ? `${on} of ${n} ${n === 1 ? "month" : "months"} on track · ${rs(sum, false)} in goals until ${label(S.months[S.months.length - 1].key)}` : "No goals yet";
+}
+$("#gl-apply").onclick = applyAll;
+$("#gl-all").addEventListener("input", e => { const c = e.target.value.replace(/[^\d.,]/g, ""); if (c !== e.target.value) e.target.value = c; });
+$("#gl-all").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); applyAll(); } });
+$("#form-goals").addEventListener("submit", async ev => {
   ev.preventDefault();
-  const raw = $("#gl-amount").value.trim(), amount = raw ? parseAmount(raw) : null, only = $("#gl-only").checked;
+  const values = {};
+  glRows().forEach(row => { values[row.dataset.k] = glVal(row); });
   try {
-    const r = await write("/api/goal", { month: GL, amount, only });
-    $("#dlg-goal").close();
+    const r = await write("/api/goals", { values });
+    $("#dlg-goals").close();
     await refresh(r);
-    toast(amount ? `Goal ${rs(amount, false)} · ${only ? label(GL) : `from ${label(GL)} on`}` : `Goal removed${only ? ` for ${label(GL)}` : ""}`);
+    const n = Object.values(values).filter(v => v > 0).length;
+    toast(n ? `Goals saved for ${n} ${n === 1 ? "month" : "months"}` : "Goals removed");
   } catch (e) { alert(e.message); }
 });
+const openGoal = k => openGoals(k);   // atalhos do Início abrem a mesma tela, já no mês certo
 
 // ---------------------------------------------------------------- Today: gastos do dia
 let DAY = null;
@@ -793,6 +846,7 @@ function renderDay() {
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 7h16M10 7V4h4v3M6 7l1 13h10l1-13M10 11v6M14 11v6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
       </div>`).join("") : `<p class="note">Nothing added on this day.</p>`}</div>
+    ${items.length ? `<p class="cd-total day-total"><span class="mono">Total of the day</span>${col(items.reduce((a, e) => a + e.value, 0))}</p>` : ""}
     <p class="cards-hint mono">expenses added in the app · installments count in full on the day you buy</p>
     <button type="button" class="ghost" id="d-import">Bring in past card expenses</button>`;
   $$("#day-list .cd-row").forEach(row => { const e = items[+row.dataset.i]; $(".cd-del", row).onclick = () => confirmDeleteEntry(row, e); });
@@ -954,7 +1008,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) { lo
 // ---------------------------------------------------------------- versão nova do site
 // O ícone na tela do iPhone guarda a página antiga por um tempo. Aqui o app pergunta ao site
 // qual é a versão publicada e, se for outra, recarrega sozinho (nunca com um formulário aberto).
-const APP_VERSION = "b8e809fb7b";   // o build do site troca pela versão publicada
+const APP_VERSION = "27bf65a039";   // o build do site troca pela versão publicada
 async function checkUpdate() {
   if (APP_VERSION.startsWith("__") || document.hidden || $("dialog[open]")) return;   // app local, ou em uso
   try {

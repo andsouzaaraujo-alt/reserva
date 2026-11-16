@@ -121,7 +121,7 @@ function gasPreview(b) {
 const GAS_ROUTES = {
   "/api/state": "getState", "/api/expense": "addExpense", "/api/fixed": "addFixed",
   "/api/fixed/update": "updateFixed", "/api/close": "closeMonth", "/api/undo": "undo", "/api/config": "saveConfig",
-  "/api/delete": "deleteExpense", "/api/cash": "addCash", "/api/goal": "setGoal", "/api/entry/delete": "deleteEntry",
+  "/api/delete": "deleteExpense", "/api/cash": "addCash", "/api/goal": "setGoal", "/api/entry/delete": "deleteEntry", "/api/import": "importCardHistory",
 };
 
 async function api(path, body) {
@@ -793,8 +793,22 @@ function renderDay() {
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 7h16M10 7V4h4v3M6 7l1 13h10l1-13M10 11v6M14 11v6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
       </div>`).join("") : `<p class="note">Nothing added on this day.</p>`}</div>
-    <p class="cards-hint mono">only expenses added in the app show up here · installments count in full on the day you buy</p>`;
+    <p class="cards-hint mono">expenses added in the app · installments count in full on the day you buy</p>
+    <button type="button" class="ghost" id="d-import">Bring in past card expenses</button>`;
   $$("#day-list .cd-row").forEach(row => { const e = items[+row.dataset.i]; $(".cd-del", row).onclick = () => confirmDeleteEntry(row, e); });
+  $("#d-import").onclick = () => importHistory(false);
+}
+
+// gastos lançados antes da aba Lançamentos (só nas abas dos cartões, com a data no nome) entram na lista
+let importTried = false;
+async function importHistory(quiet) {
+  importTried = true;
+  if (!quiet) toast("Looking for past card expenses…");
+  try {
+    const r = await write("/api/import", {});
+    await refresh(r);
+    if (!quiet || r.added) toast(r.added ? `${r.added} past card ${r.added === 1 ? "expense" : "expenses"} added to Today` : "Nothing new to bring in");
+  } catch (e) { if (!quiet) alert(e.message); }
 }
 function confirmDeleteEntry(row, e) {
   row.classList.add("confirm");
@@ -867,6 +881,8 @@ function go(v, push = true) {
   renderPageTitle();
   if (push && location.hash !== "#" + v) history.replaceState(null, "", "#" + v);
   if (S && v === "reserva") renderChart();     // precisa da largura visível para desenhar
+  // primeira vez na Today sem nada de dias anteriores: traz os gastos antigos dos cartões
+  if (S && v === "dia" && !importTried && S.log && !S.log.some(e => e.date < S.today)) importHistory(true);
   window.scrollTo(0, 0);
 }
 $$(".tabbar [data-go]").forEach(b => b.onclick = () => go(b.dataset.go));
@@ -938,7 +954,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) { lo
 // ---------------------------------------------------------------- versão nova do site
 // O ícone na tela do iPhone guarda a página antiga por um tempo. Aqui o app pergunta ao site
 // qual é a versão publicada e, se for outra, recarrega sozinho (nunca com um formulário aberto).
-const APP_VERSION = "a0bd6a8ec4";   // o build do site troca pela versão publicada
+const APP_VERSION = "b8e809fb7b";   // o build do site troca pela versão publicada
 async function checkUpdate() {
   if (APP_VERSION.startsWith("__") || document.hidden || $("dialog[open]")) return;   // app local, ou em uso
   try {
